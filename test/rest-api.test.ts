@@ -32,92 +32,165 @@ function createMockSqlStorage() {
           }
         }
       } else if (normalizedQuery.startsWith('INSERT')) {
-        // INSERT INTO documents (collection, id, data) VALUES (?, ?, ?)
-        const [collection, id, data] = params as [string, string, string]
-        const tableName = 'documents'
-        if (!tables.has(tableName)) {
-          tables.set(tableName, new Map())
+        if (query.includes('things')) {
+          // INSERT INTO things (ns, type, id, url, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+          const [ns, type, id, url, data, created_at, updated_at] = params as [string, string, string, string, string, string, string]
+          const tableName = 'things'
+          if (!tables.has(tableName)) {
+            tables.set(tableName, new Map())
+          }
+          const table = tables.get(tableName)!
+          table.set(url, { ns, type, id, url, data, created_at, updated_at })
+        } else {
+          // INSERT INTO documents (collection, id, data) VALUES (?, ?, ?)
+          const [collection, id, data] = params as [string, string, string]
+          const tableName = 'documents'
+          if (!tables.has(tableName)) {
+            tables.set(tableName, new Map())
+          }
+          const table = tables.get(tableName)!
+          const key = `${collection}:${id}`
+          table.set(key, { collection, id, data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
         }
-        const table = tables.get(tableName)!
-        const key = `${collection}:${id}`
-        table.set(key, { collection, id, data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
       } else if (normalizedQuery.startsWith('SELECT')) {
-        // SELECT data FROM documents WHERE collection = ? AND id = ?
-        const tableName = 'documents'
-        const table = tables.get(tableName)
-
-        if (table) {
-          if (query.includes('WHERE collection = ? AND id = ?')) {
-            const [collection, id] = params as [string, string]
-            const key = `${collection}:${id}`
-            const row = table.get(key)
-            if (row) {
-              results.push({ data: row.data })
+        // Handle things table queries
+        if (query.includes('things')) {
+          const thingsTable = tables.get('things')
+          if (thingsTable) {
+            if (query.includes('WHERE url = ?')) {
+              const [url] = params as [string]
+              const row = thingsTable.get(url)
+              if (row) {
+                results.push(row)
+              }
+            } else if (query.includes('WHERE type = ? AND id = ?')) {
+              // Get by type and id (for Document API compatibility)
+              const [type, id] = params as [string, string]
+              for (const row of thingsTable.values()) {
+                if (row.type === type && row.id === id) {
+                  results.push(row)
+                  break
+                }
+              }
+            } else if (query.includes('WHERE ns = ? AND type = ? AND id = ?')) {
+              const [ns, type, id] = params as [string, string, string]
+              for (const row of thingsTable.values()) {
+                if (row.ns === ns && row.type === type && row.id === id) {
+                  results.push(row)
+                  break
+                }
+              }
+            } else if (query.includes('ORDER BY') && query.includes('LIMIT')) {
+              // List things query
+              const limit = params[params.length - 2] as number
+              const offset = params[params.length - 1] as number
+              const allRows = Array.from(thingsTable.values())
+              const paginated = allRows.slice(offset, offset + limit)
+              results.push(...paginated)
             }
-          } else if (query.includes('WHERE collection IN')) {
-            // Search query with collections filter
-            const searchPattern = params[params.length - 2] as string
-            const limit = params[params.length - 1] as number
-            const collections = params.slice(0, -2) as string[]
-            const pattern = searchPattern.replace(/%/g, '').toLowerCase()
+          }
+        } else {
+          // SELECT data FROM documents WHERE collection = ? AND id = ?
+          const tableName = 'documents'
+          const table = tables.get(tableName)
 
-            for (const [key, row] of table.entries()) {
-              const rowCollection = key.split(':')[0]
-              if (collections.includes(rowCollection)) {
+          if (table) {
+            if (query.includes('WHERE collection = ? AND id = ?')) {
+              const [collection, id] = params as [string, string]
+              const key = `${collection}:${id}`
+              const row = table.get(key)
+              if (row) {
+                results.push({ data: row.data })
+              }
+            } else if (query.includes('WHERE collection IN')) {
+              // Search query with collections filter
+              const searchPattern = params[params.length - 2] as string
+              const limit = params[params.length - 1] as number
+              const collections = params.slice(0, -2) as string[]
+              const pattern = searchPattern.replace(/%/g, '').toLowerCase()
+
+              for (const [key, row] of table.entries()) {
+                const rowCollection = key.split(':')[0]
+                if (collections.includes(rowCollection)) {
+                  const dataStr = (row.data as string).toLowerCase()
+                  if (dataStr.includes(pattern)) {
+                    results.push({ collection: row.collection, id: row.id, data: row.data })
+                  }
+                }
+                if (results.length >= limit) break
+              }
+            } else if (query.includes('WHERE data LIKE')) {
+              // Search all collections
+              const searchPattern = params[0] as string
+              const limit = params[1] as number
+              const pattern = searchPattern.replace(/%/g, '').toLowerCase()
+
+              for (const [, row] of table.entries()) {
                 const dataStr = (row.data as string).toLowerCase()
                 if (dataStr.includes(pattern)) {
                   results.push({ collection: row.collection, id: row.id, data: row.data })
                 }
+                if (results.length >= limit) break
               }
-              if (results.length >= limit) break
-            }
-          } else if (query.includes('WHERE data LIKE')) {
-            // Search all collections
-            const searchPattern = params[0] as string
-            const limit = params[1] as number
-            const pattern = searchPattern.replace(/%/g, '').toLowerCase()
-
-            for (const [, row] of table.entries()) {
-              const dataStr = (row.data as string).toLowerCase()
-              if (dataStr.includes(pattern)) {
-                results.push({ collection: row.collection, id: row.id, data: row.data })
+            } else if (query.includes('WHERE collection = ?')) {
+              // List query with pagination
+              const [collection, limit, offset] = params as [string, number, number]
+              const matching: Record<string, unknown>[] = []
+              for (const [key, row] of table.entries()) {
+                if (key.startsWith(`${collection}:`)) {
+                  matching.push({ data: row.data })
+                }
               }
-              if (results.length >= limit) break
+              // Apply pagination
+              const paginated = matching.slice(offset, offset + limit)
+              results.push(...paginated)
             }
-          } else if (query.includes('WHERE collection = ?')) {
-            // List query with pagination
-            const [collection, limit, offset] = params as [string, number, number]
-            const matching: Record<string, unknown>[] = []
-            for (const [key, row] of table.entries()) {
-              if (key.startsWith(`${collection}:`)) {
-                matching.push({ data: row.data })
-              }
-            }
-            // Apply pagination
-            const paginated = matching.slice(offset, offset + limit)
-            results.push(...paginated)
           }
         }
       } else if (normalizedQuery.startsWith('UPDATE')) {
-        // UPDATE documents SET data = ?, updated_at = CURRENT_TIMESTAMP WHERE collection = ? AND id = ?
-        const [data, collection, id] = params as [string, string, string]
-        const tableName = 'documents'
-        const table = tables.get(tableName)
-        if (table) {
-          const key = `${collection}:${id}`
-          const existing = table.get(key)
-          if (existing) {
-            table.set(key, { ...existing, data, updated_at: new Date().toISOString() })
+        if (query.includes('things')) {
+          // UPDATE things SET data = ?, updated_at = ? WHERE type = ? AND id = ?
+          const [data, updated_at, type, id] = params as [string, string, string, string]
+          const thingsTable = tables.get('things')
+          if (thingsTable) {
+            // Find the thing by type and id
+            for (const [url, row] of thingsTable.entries()) {
+              if (row.type === type && row.id === id) {
+                thingsTable.set(url, { ...row, data, updated_at })
+                break
+              }
+            }
+          }
+        } else {
+          // UPDATE documents SET data = ?, updated_at = CURRENT_TIMESTAMP WHERE collection = ? AND id = ?
+          const [data, collection, id] = params as [string, string, string]
+          const tableName = 'documents'
+          const table = tables.get(tableName)
+          if (table) {
+            const key = `${collection}:${id}`
+            const existing = table.get(key)
+            if (existing) {
+              table.set(key, { ...existing, data, updated_at: new Date().toISOString() })
+            }
           }
         }
       } else if (normalizedQuery.startsWith('DELETE')) {
-        // DELETE FROM documents WHERE collection = ? AND id = ?
-        const [collection, id] = params as [string, string]
-        const tableName = 'documents'
-        const table = tables.get(tableName)
-        if (table) {
-          const key = `${collection}:${id}`
-          table.delete(key)
+        if (query.includes('things')) {
+          // DELETE FROM things WHERE url = ?
+          const [url] = params as [string]
+          const thingsTable = tables.get('things')
+          if (thingsTable) {
+            thingsTable.delete(url)
+          }
+        } else {
+          // DELETE FROM documents WHERE collection = ? AND id = ?
+          const [collection, id] = params as [string, string]
+          const tableName = 'documents'
+          const table = tables.get(tableName)
+          if (table) {
+            const key = `${collection}:${id}`
+            table.delete(key)
+          }
         }
       }
 

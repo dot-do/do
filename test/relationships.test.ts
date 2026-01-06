@@ -32,12 +32,9 @@ function createMockSqlStorage() {
       const results: unknown[] = []
       const normalizedQuery = query.trim().toUpperCase()
 
-      // CREATE TABLE statements
-      if (normalizedQuery.startsWith('CREATE TABLE')) {
-        const tableMatch = query.match(/CREATE TABLE IF NOT EXISTS (\w+)/i)
-        if (tableMatch) {
-          // Just acknowledge table creation
-        }
+      // CREATE TABLE / CREATE INDEX statements
+      if (normalizedQuery.startsWith('CREATE TABLE') || normalizedQuery.startsWith('CREATE INDEX')) {
+        // Just acknowledge table/index creation
         return { toArray: () => results }
       }
 
@@ -117,20 +114,28 @@ function createMockSqlStorage() {
             }
           }
         }
-        // Get relationships by from and to and type (for unrelate)
-        else if (query.includes('"from" = ?') && query.includes('"to" = ?') && query.includes('type = ?')) {
-          const [from, type, to] = params as [string, string, string]
+        // Get all relationships for a URL (both directions) - check FIRST since OR queries may also have type = ?
+        // Handles:
+        // - WHERE "from" = ? OR "to" = ? (no type filter)
+        // - WHERE ("from" = ? OR "to" = ?) AND type = ? (with parentheses and type filter)
+        else if (query.includes('"from" = ?') && query.includes('"to" = ?') && query.includes('OR')) {
+          // Params are [url, url, type?] or [url, url] depending on whether type filter is used
+          const [url1, url2, typeFilter] = params as [string, string, string | undefined]
           for (const rel of relationships.values()) {
-            if (rel.from === from && rel.to === to && rel.type === type) {
+            // Match if either 'from' or 'to' equals the URL
+            const matchesUrl = rel.from === url1 || rel.to === url2
+            // Match if no type filter or type matches
+            const matchesType = !typeFilter || rel.type === typeFilter
+            if (matchesUrl && matchesType) {
               results.push(rel)
             }
           }
         }
-        // Get all relationships for a URL (both directions)
-        else if (query.includes('WHERE "from" = ? OR "to" = ?')) {
-          const [url1, url2, type] = params as [string, string, string | undefined]
+        // Get relationships by from and to and type (for unrelate - exact match, no OR)
+        else if (query.includes('"from" = ?') && query.includes('"to" = ?') && query.includes('type = ?')) {
+          const [from, type, to] = params as [string, string, string]
           for (const rel of relationships.values()) {
-            if ((rel.from === url1 || rel.to === url2) && (!type || rel.type === type)) {
+            if (rel.from === from && rel.to === to && rel.type === type) {
               results.push(rel)
             }
           }

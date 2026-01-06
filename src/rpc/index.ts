@@ -2,9 +2,13 @@
  * @dotdo/do/rpc - RPC Layer
  *
  * Implements RpcTarget pattern with capnweb-style HTTP/WS support.
+ * Also exports JSON-RPC 2.0 compliant server/client implementation.
  */
 
 import type { RpcRequest } from '../types'
+
+// Re-export JSON-RPC 2.0 module
+export * from './json-rpc'
 
 /**
  * Base class for RPC targets
