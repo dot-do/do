@@ -111,7 +111,7 @@ export interface ContextBuilderResult {
  */
 export interface ExecutionContext {
   /** Callable methods bound to the DO instance */
-  [key: string]: Function
+  [key: string]: Function | Record<string, MethodMetadata> | Record<string, string[]> | undefined
   /** Metadata for all exposed methods */
   __methods__?: Record<string, MethodMetadata>
   /** Methods grouped by category */

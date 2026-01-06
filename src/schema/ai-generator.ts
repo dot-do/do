@@ -192,12 +192,12 @@ function generateId(): string {
 export function createAIGenerator(provider: GeneratorProvider): AIGenerator {
   return {
     async generate<T>(schema: BaseType<T>, options?: GenerateOptions): Promise<T> {
-      const typeStr = getTypeString(schema)
+      const typeStr = getTypeString(schema as BaseType<unknown>)
       const hints = schema.getAIHints()
 
       // For objects/schemas, generate each field
       if (typeStr === 'object') {
-        const shape = getShape(schema)
+        const shape = getShape(schema as BaseType<unknown>)
         if (!shape) {
           return {} as T
         }

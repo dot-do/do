@@ -10,7 +10,6 @@ import type {
   Migration,
   MigrationResult,
   MigrationHistoryEntry,
-  ColumnDefinition,
 } from './types'
 import { createHash } from 'crypto'
 
@@ -27,7 +26,6 @@ interface SqlStorage {
 export class SchemaManager {
   private sql: SqlStorage
   private migrations: Map<number, Migration> = new Map()
-  private initialized = false
 
   constructor(sql: SqlStorage) {
     this.sql = sql
@@ -71,7 +69,6 @@ export class SchemaManager {
       `)
     }
 
-    this.initialized = true
   }
 
   /**

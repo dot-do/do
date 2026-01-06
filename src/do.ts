@@ -70,11 +70,6 @@ import type {
 } from './types'
 
 // Placeholder types until we can import from agents package
-type ExecutionContext = {
-  waitUntil(promise: Promise<unknown>): void
-  passThroughOnException(): void
-}
-
 type SqlExecResult = {
   toArray(): unknown[]
 }
@@ -109,7 +104,7 @@ export interface ConnectionMetadata {
   [key: string]: unknown
 }
 
-export class DO<Env = unknown, State = unknown> {
+export class DO<Env = unknown, _State = unknown> {
   protected ctx: DurableObjectState
   protected env: Env
   private schemaInitialized = false
@@ -1213,7 +1208,7 @@ export class DO<Env = unknown, State = unknown> {
   ): Promise<Event<T>> {
     // Early validation for undefined options
     if (!options) {
-      throw new ValidationError('options is required', 'options')
+      throw new ValidationError('options is required')
     }
 
     // Auto-populate source from auth context if not provided
@@ -1667,7 +1662,7 @@ export class DO<Env = unknown, State = unknown> {
   ): Promise<Action<T>> {
     // Early validation for undefined options
     if (!options) {
-      throw new ValidationError('options is required', 'options')
+      throw new ValidationError('options is required')
     }
 
     // Auto-populate actor from auth context if not provided
@@ -2029,7 +2024,7 @@ export class DO<Env = unknown, State = unknown> {
       completedAt: undefined,
       error: undefined,
       result: undefined,
-      metadata: updatedMetadata as T,
+      metadata: updatedMetadata as unknown as T,
       updatedAt: new Date(now),
     }
   }
@@ -2110,7 +2105,7 @@ export class DO<Env = unknown, State = unknown> {
       completedAt: undefined,
       error: undefined,
       result: undefined,
-      metadata: resetMetadata as T,
+      metadata: resetMetadata as unknown as T,
       updatedAt: new Date(now),
     }
   }
@@ -3414,13 +3409,12 @@ export class DO<Env = unknown, State = unknown> {
           // Check if this is an auth message
           if (data.type === 'auth') {
             // Update stored auth for this WebSocket
-            const newAuth: AuthContext = {
-              ...(data.token && { token: data.token as string }),
-              ...(data.userId && { userId: data.userId as string }),
-              ...(data.organizationId && { organizationId: data.organizationId as string }),
-              ...(data.permissions && { permissions: data.permissions as string[] }),
-              ...(data.metadata && { metadata: data.metadata as Record<string, unknown> }),
-            }
+            const newAuth: AuthContext = {}
+            if (data.token) newAuth.token = data.token as string
+            if (data.userId) newAuth.userId = data.userId as string
+            if (data.organizationId) newAuth.organizationId = data.organizationId as string
+            if (data.permissions) newAuth.permissions = data.permissions as string[]
+            if (data.metadata) newAuth.metadata = data.metadata as Record<string, unknown>
             this.setWebSocketAuth(ws, newAuth)
             ws.send(JSON.stringify({ type: 'auth', status: 'ok' }))
             return
@@ -3486,7 +3480,7 @@ export class DO<Env = unknown, State = unknown> {
   /**
    * Handle WebSocket error
    */
-  async webSocketError(ws: WebSocket, error: unknown): Promise<void> {
+  async webSocketError(_ws: WebSocket, error: unknown): Promise<void> {
     console.error('WebSocket error:', error)
   }
 

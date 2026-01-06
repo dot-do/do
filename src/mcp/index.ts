@@ -246,7 +246,7 @@ export class McpHandler {
   /**
    * Create MCP-compliant error response
    */
-  private createErrorResponse(error: unknown, toolName: string, requestId?: string): Response {
+  private createErrorResponse(error: unknown, _toolName: string, requestId?: string): Response {
     if (error instanceof z.ZodError) {
       // Check if there are any issues
       if (!error.issues || error.issues.length === 0) {

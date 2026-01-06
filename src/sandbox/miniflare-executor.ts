@@ -111,7 +111,7 @@ function createMockWorkerGlobals(): MockWorkerGlobals {
     URLSearchParams,
     TextEncoder,
     TextDecoder,
-    crypto: globalThis.crypto,
+    crypto: (globalThis as unknown as { crypto: Crypto }).crypto,
     atob: globalThis.atob,
     btoa: globalThis.btoa,
   }

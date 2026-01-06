@@ -1187,7 +1187,7 @@ export class RefType extends BaseType<RefObject | RefObject[]> {
   /**
    * Validates a single reference object.
    */
-  private validateSingleRef(value: unknown): ValidationResult<RefObject> {
+  private validateSingleRef(value: unknown): ValidationResult<RefObject | RefObject[]> {
     if (value === null || typeof value !== 'object' || Array.isArray(value)) {
       return this.failure(`Expected ${this._typeName} reference object`, 'invalid_type')
     }
@@ -1236,7 +1236,7 @@ export class RefType extends BaseType<RefObject | RefObject[]> {
       for (let i = 0; i < value.length; i++) {
         const itemResult = this.validateSingleRef(value[i])
         if (itemResult.success) {
-          results.push(itemResult.data)
+          results.push(itemResult.data as RefObject)
         } else {
           // Prepend index to error paths
           itemResult.errors!.forEach((err) => {
@@ -1413,8 +1413,11 @@ export class SchemaType<T extends Record<string, unknown>> extends BaseType<T> {
 
   /**
    * Makes all fields required (reverses partial()).
+   * Note: This overrides BaseType.required() with different semantics -
+   * it makes all fields of this object required, rather than wrapping in RequiredType.
    */
-  required(): SchemaType<Required<T>> {
+  // @ts-expect-error - intentionally overriding with different return type
+  override required(): SchemaType<Required<T>> {
     const clone = this.clone() as unknown as SchemaType<Required<T>>
     clone.partialMode = false
     return clone
@@ -1430,7 +1433,8 @@ export class SchemaType<T extends Record<string, unknown>> extends BaseType<T> {
         newShape[key as string] = this.shape[key] as BaseType<unknown>
       }
     }
-    const clone = new SchemaType(newShape as { [P in K]: BaseType<T[P]> })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const clone = new SchemaType(newShape as any)
     clone.strictMode = this.strictMode
     clone.passthroughMode = this.passthroughMode
     clone.partialMode = this.partialMode
@@ -1448,7 +1452,8 @@ export class SchemaType<T extends Record<string, unknown>> extends BaseType<T> {
         newShape[key] = schema as BaseType<unknown>
       }
     }
-    const clone = new SchemaType(newShape as { [P in Exclude<keyof T, K>]: BaseType<T[P]> })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const clone = new SchemaType(newShape as any)
     clone.strictMode = this.strictMode
     clone.passthroughMode = this.passthroughMode
     clone.partialMode = this.partialMode

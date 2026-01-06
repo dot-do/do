@@ -351,9 +351,9 @@ export class JsonRpcServer {
         ...context,
         id: req.id,
       })
-      return this.createSuccessResponse(req.id, result)
+      return this.createSuccessResponse(req.id ?? null, result)
     } catch (error) {
-      return this.createErrorResponse(req.id, this.errorToJsonRpcError(error))
+      return this.createErrorResponse(req.id ?? null, this.errorToJsonRpcError(error))
     }
   }
 
@@ -614,14 +614,18 @@ export class JsonRpcClient {
 
     const response = await this.sendRequest(request)
 
-    if (response.error) {
+    if (Array.isArray(response)) {
+      throw new Error('Unexpected batch response for single request')
+    }
+
+    if ('error' in response && response.error) {
       const error = new Error(response.error.message) as Error & { code: number; data: unknown }
       error.code = response.error.code
       error.data = response.error.data
       throw error
     }
 
-    return response.result as T
+    return (response as { result?: unknown }).result as T
   }
 
   /**
@@ -656,7 +660,7 @@ export class JsonRpcClient {
     const responseMap = new Map(responses.map((r) => [r.id, r]))
 
     return batchRequest.map((req) => {
-      const response = responseMap.get(req.id)
+      const response = responseMap.get(req.id!)
       if (!response) {
         throw new Error(`Missing response for request ${req.id}`)
       }

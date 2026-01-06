@@ -130,7 +130,7 @@ function transpileTypeScript(code: string, strictTypeChecking?: boolean): string
 
   // Handle enums by converting to object
   // enum Direction { Up = 'UP', Down = 'DOWN' } -> const Direction = { Up: 'UP', Down: 'DOWN' }
-  code = code.replace(/enum\s+(\w+)\s*\{([^}]+)\}/g, (match, name, body) => {
+  code = code.replace(/enum\s+(\w+)\s*\{([^}]+)\}/g, (_match, name, body) => {
     const entries = body.split(',').map((entry: string) => entry.trim()).filter(Boolean)
     const converted = entries.map((entry: string) => {
       const [key, value] = entry.split('=').map((s: string) => s.trim())
