@@ -35,6 +35,15 @@ import type {
   Event,
   CreateEventOptions,
   EventQueryOptions,
+  Artifact,
+  ArtifactType,
+  StoreArtifactOptions,
+  WorkflowContext,
+  WorkflowState,
+  WorkflowHistoryEntry,
+  ScheduleInterval,
+  EventHandler,
+  ScheduleHandler,
 } from './types'
 
 // Placeholder types until we can import from agents package
@@ -70,6 +79,11 @@ export class DO<Env = unknown, State = unknown> {
   protected ctx: DurableObjectState
   protected env: Env
   private schemaInitialized = false
+
+  // Workflow handlers stored in memory (registered via registerWorkflowHandler)
+  private workflowHandlers: Map<string, EventHandler> = new Map()
+  // Workflow schedules stored in memory (registered via registerSchedule)
+  private workflowSchedules: Array<{ interval: ScheduleInterval; handler: ScheduleHandler }> = []
 
   /**
    * Allowlist of methods that can be invoked via RPC.
@@ -115,6 +129,20 @@ export class DO<Env = unknown, State = unknown> {
     'related',
     'relationships',
     'references',
+    // Artifact operations
+    'storeArtifact',
+    'getArtifact',
+    'getArtifactBySource',
+    'deleteArtifact',
+    'cleanExpiredArtifacts',
+    // Workflow operations
+    'createWorkflowContext',
+    'getWorkflowState',
+    'saveWorkflowState',
+    'registerWorkflowHandler',
+    'registerSchedule',
+    'getWorkflowHandlers',
+    'getSchedules',
   ])
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -190,6 +218,56 @@ export class DO<Env = unknown, State = unknown> {
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
         started_at TEXT,
         completed_at TEXT
+      )
+    `)
+
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS artifacts (
+        key TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        source TEXT NOT NULL,
+        source_hash TEXT NOT NULL,
+        content TEXT NOT NULL,
+        size INTEGER,
+        metadata TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        expires_at TEXT
+      )
+    `)
+
+    this.ctx.storage.sql.exec(`
+      CREATE INDEX IF NOT EXISTS idx_artifacts_source ON artifacts(source, type)
+    `)
+
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS workflow_state (
+        id TEXT PRIMARY KEY DEFAULT 'default',
+        current TEXT,
+        context TEXT DEFAULT '{}',
+        history TEXT DEFAULT '[]',
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS workflow_handlers (
+        id TEXT PRIMARY KEY,
+        event_pattern TEXT NOT NULL,
+        handler_type TEXT NOT NULL,
+        schedule TEXT,
+        handler_fn TEXT NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS workflow_schedules (
+        id TEXT PRIMARY KEY,
+        schedule_type TEXT NOT NULL,
+        schedule_value INTEGER,
+        cron_expression TEXT,
+        handler_id TEXT NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
       )
     `)
 
@@ -1818,6 +1896,452 @@ export class DO<Env = unknown, State = unknown> {
       metadata: resetMetadata as T,
       updatedAt: new Date(now),
     }
+  }
+
+  // ============================================
+  // Artifact Operations (Cached Content)
+  // ============================================
+
+  /**
+   * Store an artifact (cached content with optional TTL)
+   */
+  async storeArtifact<T>(options: StoreArtifactOptions<T>): Promise<Artifact<T>> {
+    this.initSchema()
+
+    const { key, type, source, sourceHash, content, ttl, metadata } = options
+    const now = new Date()
+    const contentStr = JSON.stringify(content)
+    const size = contentStr.length
+    const expiresAt = ttl !== undefined ? new Date(now.getTime() + ttl) : undefined
+
+    // Use INSERT OR REPLACE for upsert behavior
+    this.ctx.storage.sql.exec(
+      `INSERT OR REPLACE INTO artifacts (key, type, source, source_hash, content, size, metadata, created_at, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      key,
+      type,
+      source,
+      sourceHash,
+      contentStr,
+      size,
+      metadata ? JSON.stringify(metadata) : null,
+      now.toISOString(),
+      expiresAt ? expiresAt.toISOString() : null
+    )
+
+    return {
+      key,
+      type,
+      source,
+      sourceHash,
+      content,
+      createdAt: now,
+      expiresAt,
+      size,
+      metadata,
+    }
+  }
+
+  /**
+   * Get an artifact by key
+   */
+  async getArtifact<T = unknown>(key: string): Promise<Artifact<T> | null> {
+    this.initSchema()
+
+    const results = this.ctx.storage.sql
+      .exec('SELECT * FROM artifacts WHERE key = ?', key)
+      .toArray()
+
+    if (results.length === 0) {
+      return null
+    }
+
+    const row = results[0] as {
+      key: string
+      type: string
+      source: string
+      source_hash: string
+      content: string
+      size: number | null
+      metadata: string | null
+      created_at: string
+      expires_at: string | null
+    }
+
+    return {
+      key: row.key,
+      type: row.type as ArtifactType,
+      source: row.source,
+      sourceHash: row.source_hash,
+      content: JSON.parse(row.content) as T,
+      createdAt: new Date(row.created_at),
+      expiresAt: row.expires_at ? new Date(row.expires_at) : undefined,
+      size: row.size ?? undefined,
+      metadata: row.metadata ? JSON.parse(row.metadata) : undefined,
+    }
+  }
+
+  /**
+   * Get an artifact by source URL and type
+   */
+  async getArtifactBySource(source: string, type: ArtifactType): Promise<Artifact | null> {
+    this.initSchema()
+
+    const results = this.ctx.storage.sql
+      .exec('SELECT * FROM artifacts WHERE source = ? AND type = ?', source, type)
+      .toArray()
+
+    if (results.length === 0) {
+      return null
+    }
+
+    const row = results[0] as {
+      key: string
+      type: string
+      source: string
+      source_hash: string
+      content: string
+      size: number | null
+      metadata: string | null
+      created_at: string
+      expires_at: string | null
+    }
+
+    return {
+      key: row.key,
+      type: row.type as ArtifactType,
+      source: row.source,
+      sourceHash: row.source_hash,
+      content: JSON.parse(row.content),
+      createdAt: new Date(row.created_at),
+      expiresAt: row.expires_at ? new Date(row.expires_at) : undefined,
+      size: row.size ?? undefined,
+      metadata: row.metadata ? JSON.parse(row.metadata) : undefined,
+    }
+  }
+
+  /**
+   * Delete an artifact by key
+   */
+  async deleteArtifact(key: string): Promise<boolean> {
+    this.initSchema()
+
+    // Check if artifact exists first
+    const existing = await this.getArtifact(key)
+    if (!existing) {
+      return false
+    }
+
+    this.ctx.storage.sql.exec('DELETE FROM artifacts WHERE key = ?', key)
+    return true
+  }
+
+  /**
+   * Clean up expired artifacts
+   * Returns the number of artifacts deleted
+   */
+  async cleanExpiredArtifacts(): Promise<number> {
+    this.initSchema()
+
+    const now = new Date().toISOString()
+
+    // Get count of expired artifacts before deletion
+    const expiredResults = this.ctx.storage.sql
+      .exec(
+        'SELECT COUNT(*) as count FROM artifacts WHERE expires_at IS NOT NULL AND expires_at < ?',
+        now
+      )
+      .toArray()
+
+    const count = (expiredResults[0] as { count: number })?.count ?? 0
+
+    // Delete expired artifacts
+    this.ctx.storage.sql.exec(
+      'DELETE FROM artifacts WHERE expires_at IS NOT NULL AND expires_at < ?',
+      now
+    )
+
+    return count
+  }
+
+  // ============================================
+  // Workflow Operations
+  // ============================================
+
+  /**
+   * Get workflow state from database
+   */
+  async getWorkflowState(workflowId = 'default'): Promise<WorkflowState> {
+    this.initSchema()
+
+    const results = this.ctx.storage.sql
+      .exec('SELECT * FROM workflow_state WHERE id = ?', workflowId)
+      .toArray()
+
+    if (results.length === 0) {
+      return {
+        context: {},
+        history: [],
+      }
+    }
+
+    const row = results[0] as {
+      id: string
+      current: string | null
+      context: string
+      history: string
+      updated_at: string
+    }
+
+    return {
+      current: row.current ?? undefined,
+      context: JSON.parse(row.context),
+      history: JSON.parse(row.history),
+    }
+  }
+
+  /**
+   * Save workflow state to database
+   */
+  async saveWorkflowState(state: WorkflowState, workflowId = 'default'): Promise<void> {
+    this.initSchema()
+
+    const now = new Date().toISOString()
+
+    // Check if state exists
+    const existing = this.ctx.storage.sql
+      .exec('SELECT id FROM workflow_state WHERE id = ?', workflowId)
+      .toArray()
+
+    if (existing.length === 0) {
+      // Insert new state
+      this.ctx.storage.sql.exec(
+        'INSERT INTO workflow_state (id, current, context, history, updated_at) VALUES (?, ?, ?, ?, ?)',
+        workflowId,
+        state.current ?? null,
+        JSON.stringify(state.context),
+        JSON.stringify(state.history),
+        now
+      )
+    } else {
+      // Update existing state
+      this.ctx.storage.sql.exec(
+        'UPDATE workflow_state SET current = ?, context = ?, history = ?, updated_at = ? WHERE id = ?',
+        state.current ?? null,
+        JSON.stringify(state.context),
+        JSON.stringify(state.history),
+        now,
+        workflowId
+      )
+    }
+  }
+
+  /**
+   * Register a workflow handler for an event pattern
+   */
+  registerWorkflowHandler<T = unknown, R = unknown>(
+    eventPattern: string,
+    handler: EventHandler<T, R>
+  ): void {
+    this.workflowHandlers.set(eventPattern, handler as EventHandler)
+  }
+
+  /**
+   * Get registered workflow handlers for an event pattern
+   */
+  async getWorkflowHandlers(eventPattern: string): Promise<EventHandler[]> {
+    const handler = this.workflowHandlers.get(eventPattern)
+    return handler ? [handler] : []
+  }
+
+  /**
+   * Register a schedule with a handler
+   */
+  registerSchedule(interval: ScheduleInterval, handler: ScheduleHandler): void {
+    this.workflowSchedules.push({ interval, handler })
+  }
+
+  /**
+   * Get all registered schedules
+   */
+  async getSchedules(): Promise<ScheduleInterval[]> {
+    return this.workflowSchedules.map((s) => s.interval)
+  }
+
+  /**
+   * Create a WorkflowContext (the $ object passed to workflow handlers)
+   */
+  async createWorkflowContext(workflowId = 'default'): Promise<WorkflowContext> {
+    this.initSchema()
+
+    // Load existing state
+    const state = await this.getWorkflowState(workflowId)
+    const doInstance = this
+
+    // Create a proxy for state that auto-saves on write
+    const stateProxy = new Proxy(state.context, {
+      set(target, prop, value) {
+        target[prop as string] = value
+        // Schedule save (will be batched)
+        doInstance.saveWorkflowState(state, workflowId)
+        return true
+      },
+      get(target, prop) {
+        return target[prop as string]
+      },
+    })
+
+    // Internal method to add history entry
+    const addHistoryEntry = (entry: WorkflowHistoryEntry) => {
+      state.history.push(entry)
+      doInstance.saveWorkflowState(state, workflowId)
+    }
+
+    // Internal method to set current state (for state machines)
+    const setCurrentState = (current: string) => {
+      state.current = current
+      doInstance.saveWorkflowState(state, workflowId)
+    }
+
+    const $: WorkflowContext & {
+      _addHistoryEntry: (entry: WorkflowHistoryEntry) => void
+      _setCurrentState: (current: string) => void
+    } = {
+      // Fire and forget event (durable)
+      send: async <T = unknown>(event: string, data: T): Promise<void> => {
+        // Track the event durably
+        await doInstance.track({
+          type: event,
+          source: `workflow:${workflowId}`,
+          data: data as Record<string, unknown>,
+        })
+
+        // Add to history
+        addHistoryEntry({
+          timestamp: Date.now(),
+          type: 'event',
+          name: event,
+          data,
+        })
+      },
+
+      // Durable action - waits for result, retries on failure
+      do: async <TData = unknown, TResult = unknown>(
+        event: string,
+        data: TData
+      ): Promise<TResult> => {
+        const handler = doInstance.workflowHandlers.get(event)
+        if (!handler) {
+          throw new Error(`No handler registered for event: ${event}`)
+        }
+
+        // Create durable action record
+        const action = await doInstance.doAction({
+          actor: `workflow:${workflowId}`,
+          object: event,
+          action: event,
+          metadata: { data },
+        })
+
+        // Add to history
+        addHistoryEntry({
+          timestamp: Date.now(),
+          type: 'action',
+          name: event,
+          data,
+        })
+
+        // Execute with retry logic
+        const maxRetries = 3
+        let lastError: Error | undefined
+
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+          try {
+            const result = await handler(data, $)
+            // Complete the action
+            await doInstance.completeAction(action.id, result)
+            return result as TResult
+          } catch (error) {
+            lastError = error instanceof Error ? error : new Error(String(error))
+            if (attempt < maxRetries - 1) {
+              // Wait before retry with exponential backoff
+              await new Promise((resolve) =>
+                setTimeout(resolve, Math.pow(2, attempt) * 100)
+              )
+            }
+          }
+        }
+
+        // All retries failed
+        await doInstance.failAction(action.id, lastError?.message ?? 'Unknown error')
+        throw lastError
+      },
+
+      // Non-durable action - waits for result, no retries
+      try: async <TData = unknown, TResult = unknown>(
+        event: string,
+        data: TData
+      ): Promise<TResult> => {
+        const handler = doInstance.workflowHandlers.get(event)
+        if (!handler) {
+          throw new Error(`No handler registered for event: ${event}`)
+        }
+
+        // Add to history for debugging but don't persist action
+        addHistoryEntry({
+          timestamp: Date.now(),
+          type: 'action',
+          name: event,
+          data,
+        })
+
+        // Execute without retry (non-durable)
+        const result = await handler(data, $)
+        return result as TResult
+      },
+
+      // Read/write context data
+      state: stateProxy,
+
+      // Get full workflow state
+      getState: (): WorkflowState => {
+        return {
+          current: state.current,
+          context: state.context,
+          history: state.history,
+        }
+      },
+
+      // Set a value in context
+      set: <T = unknown>(key: string, value: T): void => {
+        state.context[key] = value
+        doInstance.saveWorkflowState(state, workflowId)
+      },
+
+      // Get a value from context
+      get: <T = unknown>(key: string): T | undefined => {
+        return state.context[key] as T | undefined
+      },
+
+      // Log message
+      log: (message: string, data?: unknown): void => {
+        addHistoryEntry({
+          timestamp: Date.now(),
+          type: 'event', // logs are recorded as events in history
+          name: message,
+          data,
+        })
+      },
+
+      // Access to database operations
+      db: doInstance as unknown as WorkflowContext['db'],
+
+      // Internal methods for testing
+      _addHistoryEntry: addHistoryEntry,
+      _setCurrentState: setCurrentState,
+    }
+
+    return $
   }
 
   // ============================================
