@@ -4,7 +4,7 @@
  * Implements RpcTarget pattern with capnweb-style HTTP/WS support.
  */
 
-import type { RpcRequest, RpcResponse } from '../types'
+import type { RpcRequest } from '../types'
 
 /**
  * Base class for RPC targets

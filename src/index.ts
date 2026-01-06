@@ -13,6 +13,7 @@
  */
 
 export { DO } from './do'
+export { ValidationError } from './validation'
 export * from './types'
 export * from './rpc'
 export * from './mcp'

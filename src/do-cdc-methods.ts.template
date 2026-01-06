@@ -1,0 +1,517 @@
+/**
+ * CDC Pipeline Methods for DO class
+ *
+ * These methods should be added to the DO class to implement CDC functionality
+ */
+
+// Add to initSchema():
+`
+this.ctx.storage.sql.exec(\`
+  CREATE TABLE IF NOT EXISTS cdc_batches (
+    id TEXT PRIMARY KEY,
+    status TEXT NOT NULL DEFAULT 'pending',
+    event_count INTEGER NOT NULL,
+    start_time TEXT,
+    end_time TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    transformed_at TEXT,
+    completed_at TEXT,
+    parquet_size INTEGER,
+    r2_key TEXT
+  )
+\`)
+
+this.ctx.storage.sql.exec(\`
+  CREATE INDEX IF NOT EXISTS idx_cdc_batches_status ON cdc_batches(status)
+\`)
+`
+
+// Add to allowedMethods Set:
+`
+'createCDCBatch',
+'getCDCBatch',
+'queryCDCBatches',
+'transformToParquet',
+'outputToR2',
+'processCDCPipeline',
+`
+
+// Methods to add before webSocketMessage:
+
+  // ============================================
+  // CDC Pipeline Operations
+  // ============================================
+
+  /**
+   * Create a CDC batch from events
+   */
+  async createCDCBatch(options: {
+    startTime?: Date
+    endTime?: Date
+    eventType?: string
+    maxEvents?: number
+  } = {}): Promise<{
+    id: string
+    eventCount: number
+    status: 'pending' | 'empty'
+    startTime?: Date
+    endTime?: Date
+  }> {
+    this.initSchema()
+
+    const { startTime, endTime, eventType, maxEvents } = options
+
+    // Build query to count and select events
+    const conditions: string[] = []
+    const params: unknown[] = []
+
+    if (eventType) {
+      conditions.push('type = ?')
+      params.push(eventType)
+    }
+
+    if (startTime) {
+      conditions.push('timestamp > ?')
+      params.push(startTime.toISOString())
+    }
+
+    if (endTime) {
+      conditions.push('timestamp < ?')
+      params.push(endTime.toISOString())
+    }
+
+    let query = 'SELECT COUNT(*) as count FROM events'
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ')
+    }
+
+    const countResults = this.ctx.storage.sql.exec(query, ...params).toArray()
+    const eventCount = (countResults[0] as { count: number }).count
+
+    // Apply maxEvents limit if specified
+    const actualEventCount = maxEvents !== undefined ? Math.min(eventCount, maxEvents) : eventCount
+
+    const batchId = this.generateId()
+    const now = new Date().toISOString()
+    const status = actualEventCount === 0 ? 'empty' : 'pending'
+
+    this.ctx.storage.sql.exec(
+      `INSERT INTO cdc_batches (id, status, event_count, start_time, end_time, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      batchId,
+      status,
+      actualEventCount,
+      startTime ? startTime.toISOString() : null,
+      endTime ? endTime.toISOString() : null,
+      now
+    )
+
+    return {
+      id: batchId,
+      eventCount: actualEventCount,
+      status,
+      startTime,
+      endTime,
+    }
+  }
+
+  /**
+   * Get a CDC batch by ID
+   */
+  async getCDCBatch(id: string): Promise<{
+    id: string
+    eventCount: number
+    status: string
+    startTime?: Date
+    endTime?: Date
+    createdAt: Date
+    transformedAt?: Date
+    completedAt?: Date
+    parquetSize?: number
+    r2Key?: string
+  } | null> {
+    this.initSchema()
+
+    const results = this.ctx.storage.sql
+      .exec('SELECT * FROM cdc_batches WHERE id = ?', id)
+      .toArray()
+
+    if (results.length === 0) {
+      return null
+    }
+
+    const row = results[0] as {
+      id: string
+      status: string
+      event_count: number
+      start_time: string | null
+      end_time: string | null
+      created_at: string
+      transformed_at: string | null
+      completed_at: string | null
+      parquet_size: number | null
+      r2_key: string | null
+    }
+
+    return {
+      id: row.id,
+      eventCount: row.event_count,
+      status: row.status,
+      startTime: row.start_time ? new Date(row.start_time) : undefined,
+      endTime: row.end_time ? new Date(row.end_time) : undefined,
+      createdAt: new Date(row.created_at),
+      transformedAt: row.transformed_at ? new Date(row.transformed_at) : undefined,
+      completedAt: row.completed_at ? new Date(row.completed_at) : undefined,
+      parquetSize: row.parquet_size ?? undefined,
+      r2Key: row.r2_key ?? undefined,
+    }
+  }
+
+  /**
+   * Query CDC batches by status
+   */
+  async queryCDCBatches(options: { status?: string } = {}): Promise<Array<{
+    id: string
+    eventCount: number
+    status: string
+  }>> {
+    this.initSchema()
+
+    let query = 'SELECT id, event_count, status FROM cdc_batches'
+    const params: unknown[] = []
+
+    if (options.status) {
+      query += ' WHERE status = ?'
+      params.push(options.status)
+    }
+
+    query += ' ORDER BY created_at DESC'
+
+    const results = this.ctx.storage.sql.exec(query, ...params).toArray()
+
+    return results.map((row) => {
+      const r = row as { id: string; event_count: number; status: string }
+      return {
+        id: r.id,
+        eventCount: r.event_count,
+        status: r.status,
+      }
+    })
+  }
+
+  /**
+   * Transform a batch to Parquet format
+   */
+  async transformToParquet(
+    batchId: string,
+    options: {
+      compression?: 'UNCOMPRESSED' | 'SNAPPY' | 'GZIP'
+      rowGroupSize?: number
+      includeSchema?: boolean
+      includeStats?: boolean
+    } = {}
+  ): Promise<ArrayBuffer | {
+    parquetData: ArrayBuffer
+    schema: { fields: Array<{ name: string; type: string }> }
+    stats?: {
+      rowCount: number
+      columnCount: number
+      uncompressedSize: number
+      compressedSize: number
+      compressionRatio: number
+      transformDurationMs: number
+    }
+  }> {
+    this.initSchema()
+
+    const startTime = Date.now()
+
+    // Get the batch
+    const batch = await this.getCDCBatch(batchId)
+    if (!batch) {
+      throw new Error('Batch not found')
+    }
+
+    if (batch.status === 'empty') {
+      throw new Error('Cannot transform empty batch')
+    }
+
+    if (batch.status === 'transformed' || batch.status === 'completed') {
+      throw new Error('Batch already transformed')
+    }
+
+    // Fetch events for this batch
+    const conditions: string[] = []
+    const params: unknown[] = []
+
+    if (batch.startTime) {
+      conditions.push('timestamp > ?')
+      params.push(batch.startTime.toISOString())
+    }
+
+    if (batch.endTime) {
+      conditions.push('timestamp < ?')
+      params.push(batch.endTime.toISOString())
+    }
+
+    let query = 'SELECT * FROM events'
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ')
+    }
+    query += ' ORDER BY timestamp ASC'
+
+    const results = this.ctx.storage.sql.exec(query, ...params).toArray()
+
+    const events = results.map((row) => {
+      const r = row as {
+        id: string
+        type: string
+        timestamp: string
+        source: string
+        data: string
+        correlation_id: string | null
+        causation_id: string | null
+      }
+      return {
+        id: r.id,
+        type: r.type,
+        timestamp: r.timestamp,
+        source: r.source,
+        data: JSON.parse(r.data),
+        correlationId: r.correlation_id,
+        causationId: r.causation_id,
+      }
+    })
+
+    // Create Parquet data using minimal encoder
+    const { ParquetEncoder } = await import('./cdc-pipeline')
+    const parquetData = ParquetEncoder.encode(events, options)
+
+    // Update batch status
+    const now = new Date().toISOString()
+    this.ctx.storage.sql.exec(
+      'UPDATE cdc_batches SET status = ?, transformed_at = ?, parquet_size = ? WHERE id = ?',
+      'transformed',
+      now,
+      parquetData.byteLength,
+      batchId
+    )
+
+    // Return with schema and stats if requested
+    if (options.includeSchema || options.includeStats) {
+      const schema = this.inferParquetSchema(events[0])
+      const result: {
+        parquetData: ArrayBuffer
+        schema: { fields: Array<{ name: string; type: string }> }
+        stats?: {
+          rowCount: number
+          columnCount: number
+          uncompressedSize: number
+          compressedSize: number
+          compressionRatio: number
+          transformDurationMs: number
+        }
+      } = {
+        parquetData,
+        schema: { fields: schema },
+      }
+
+      if (options.includeStats) {
+        result.stats = ParquetEncoder.calculateStats(parquetData, events, schema, startTime)
+      }
+
+      return result
+    }
+
+    return parquetData
+  }
+
+  /**
+   * Infer Parquet schema from an event
+   */
+  private inferParquetSchema(event: Record<string, unknown>): Array<{ name: string; type: string }> {
+    const schema: Array<{ name: string; type: string }> = []
+
+    schema.push({ name: 'id', type: 'STRING' })
+    schema.push({ name: 'type', type: 'STRING' })
+    schema.push({ name: 'timestamp', type: 'STRING' })
+    schema.push({ name: 'source', type: 'STRING' })
+
+    if (event.data && typeof event.data === 'object') {
+      this.inferDataSchema(event.data as Record<string, unknown>, 'data', schema)
+    }
+
+    return schema
+  }
+
+  /**
+   * Recursively infer schema from data object
+   */
+  private inferDataSchema(
+    obj: Record<string, unknown>,
+    prefix: string,
+    schema: Array<{ name: string; type: string }>
+  ): void {
+    for (const [key, value] of Object.entries(obj)) {
+      const fieldName = `${prefix}.${key}`
+      const fieldType = this.inferParquetType(value)
+
+      if (fieldType !== 'OBJECT' && fieldType !== 'ARRAY') {
+        schema.push({ name: fieldName, type: fieldType })
+      } else if (fieldType === 'OBJECT' && value && typeof value === 'object' && !Array.isArray(value)) {
+        this.inferDataSchema(value as Record<string, unknown>, fieldName, schema)
+      }
+    }
+  }
+
+  /**
+   * Infer Parquet type from value
+   */
+  private inferParquetType(value: unknown): string {
+    if (value === null || value === undefined) return 'STRING'
+    if (typeof value === 'boolean') return 'BOOLEAN'
+    if (typeof value === 'number') {
+      return Number.isInteger(value) ? 'INT64' : 'DOUBLE'
+    }
+    if (typeof value === 'string') return 'STRING'
+    if (Array.isArray(value)) return 'ARRAY'
+    if (typeof value === 'object') return 'OBJECT'
+    return 'STRING'
+  }
+
+  /**
+   * Output Parquet data to R2
+   */
+  async outputToR2(batchId: string): Promise<{
+    key: string
+    bucket: string
+    size: number
+  }> {
+    this.initSchema()
+
+    const batch = await this.getCDCBatch(batchId)
+    if (!batch) {
+      throw new Error('Batch not found')
+    }
+
+    if (batch.status !== 'transformed') {
+      throw new Error('Batch must be transformed before output')
+    }
+
+    // Re-fetch the Parquet data - need to get it from a stored location or regenerate
+    // For now, we'll store a reference and regenerate on demand
+    const conditions: string[] = []
+    const params: unknown[] = []
+
+    if (batch.startTime) {
+      conditions.push('timestamp > ?')
+      params.push(batch.startTime.toISOString())
+    }
+
+    if (batch.endTime) {
+      conditions.push('timestamp < ?')
+      params.push(batch.endTime.toISOString())
+    }
+
+    let query = 'SELECT * FROM events'
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ')
+    }
+    query += ' ORDER BY timestamp ASC'
+
+    const results = this.ctx.storage.sql.exec(query, ...params).toArray()
+
+    const events = results.map((row) => {
+      const r = row as {
+        id: string
+        type: string
+        timestamp: string
+        source: string
+        data: string
+        correlation_id: string | null
+        causation_id: string | null
+      }
+      return {
+        id: r.id,
+        type: r.type,
+        timestamp: r.timestamp,
+        source: r.source,
+        data: JSON.parse(r.data),
+        correlationId: r.correlation_id,
+        causationId: r.causation_id,
+      }
+    })
+
+    const { ParquetEncoder } = await import('./cdc-pipeline')
+    const parquetBuffer = ParquetEncoder.encode(events, {})
+
+    // Generate partitioned R2 key
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const day = String(now.getDate()).padStart(2, '0')
+    const key = `year=${year}/month=${month}/day=${day}/${batchId}.parquet`
+
+    // Upload to R2
+    const env = this.env as { CDC_BUCKET?: { put: (key: string, data: ArrayBuffer) => Promise<void> } }
+    if (env.CDC_BUCKET) {
+      await env.CDC_BUCKET.put(key, parquetBuffer)
+    }
+
+    // Update batch status
+    const completedAt = new Date().toISOString()
+    this.ctx.storage.sql.exec(
+      'UPDATE cdc_batches SET status = ?, completed_at = ?, r2_key = ? WHERE id = ?',
+      'completed',
+      completedAt,
+      key,
+      batchId
+    )
+
+    return {
+      key,
+      bucket: 'CDC_BUCKET',
+      size: parquetBuffer.byteLength,
+    }
+  }
+
+  /**
+   * Process full CDC pipeline: batch -> transform -> output
+   */
+  async processCDCPipeline(options: {
+    startTime?: Date
+    endTime?: Date
+    eventType?: string
+    maxEvents?: number
+  } = {}): Promise<{
+    batchId: string
+    eventCount: number
+    status: string
+    r2Key?: string
+  }> {
+    this.initSchema()
+
+    // Create batch
+    const batch = await this.createCDCBatch(options)
+
+    if (batch.status === 'empty') {
+      return {
+        batchId: batch.id,
+        eventCount: 0,
+        status: 'skipped',
+      }
+    }
+
+    // Transform to Parquet
+    await this.transformToParquet(batch.id)
+
+    // Output to R2
+    const r2Result = await this.outputToR2(batch.id)
+
+    return {
+      batchId: batch.id,
+      eventCount: batch.eventCount,
+      status: 'completed',
+      r2Key: r2Result.key,
+    }
+  }

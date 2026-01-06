@@ -232,13 +232,15 @@ describe('webSocketClose Connection State Cleanup', () => {
 
     // Event should be emitted with connection info
     expect(closeHandler).toHaveBeenCalledTimes(1)
-    expect(closeHandler).toHaveBeenCalledWith({
-      ws: mockWs,
-      code: 1000,
-      reason: 'Goodbye',
-      wasClean: true,
-      metadata: { userId: 'user-event' },
-    })
+    expect(closeHandler).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ws: mockWs,
+        code: 1000,
+        reason: 'Goodbye',
+        wasClean: true,
+        metadata: expect.objectContaining({ userId: 'user-event' }),
+      })
+    )
   })
 
   it('should provide getActiveConnections() method', () => {

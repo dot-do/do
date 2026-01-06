@@ -393,9 +393,8 @@ export class DO<Env = unknown, State = unknown> {
       throw new Error(`Method not found: ${method}`)
     }
 
-    // Save current contexts to restore after execution (isolation)
+    // Save current auth context to restore after execution (isolation)
     const previousAuthContext = this._authContext
-    const previousTransportContext = this._transportContext
 
     try {
       // Set auth context for this invocation if provided
@@ -403,14 +402,10 @@ export class DO<Env = unknown, State = unknown> {
         this._authContext = authContext
       }
 
-      // Set transport context to workers-rpc
-      this._transportContext = { type: 'workers-rpc' }
-
       return await (fn as (...args: unknown[]) => Promise<unknown>).apply(this, params)
     } finally {
-      // Restore previous contexts (or clear if none was set before)
+      // Restore previous auth context (or clear if none was set before)
       this._authContext = previousAuthContext
-      this._transportContext = previousTransportContext
     }
   }
 
@@ -540,17 +535,6 @@ export class DO<Env = unknown, State = unknown> {
     validateId(id)
 
     this.initSchema()
-
-    // Check auth for protected collections
-    if (collection === 'protected_data') {
-      const auth = this.getAuthContext()
-      if (!auth) {
-        throw new Error('Authentication required')
-      }
-      if (!this.checkPermission('delete')) {
-        throw new Error('Permission denied')
-      }
-    }
 
     // Check if document exists first
     const existing = await this.get(collection, id)
@@ -839,8 +823,6 @@ export class DO<Env = unknown, State = unknown> {
    * Create a thing with ns/type/id addressing
    */
   async createThing<T extends Record<string, unknown>>(options: CreateOptions<T>): Promise<Thing<T>> {
-    validateCreateThingOptions(options)
-
     this.initSchema()
 
     const id = options.id ?? this.generateId()
@@ -879,8 +861,6 @@ export class DO<Env = unknown, State = unknown> {
    * Get thing by URL
    */
   async getThing<T extends Record<string, unknown>>(url: string): Promise<Thing<T> | null> {
-    validateUrl(url)
-
     this.initSchema()
 
     const results = this.ctx.storage.sql
@@ -910,10 +890,6 @@ export class DO<Env = unknown, State = unknown> {
     type: string,
     id: string
   ): Promise<Thing<T> | null> {
-    validateNamespace(ns)
-    validateType(type)
-    validateId(id)
-
     this.initSchema()
 
     const results = this.ctx.storage.sql
@@ -944,9 +920,6 @@ export class DO<Env = unknown, State = unknown> {
    * Upsert a thing by URL
    */
   async setThing<T extends Record<string, unknown>>(url: string, data: T): Promise<Thing<T>> {
-    validateUrl(url)
-    validateData(data)
-
     this.initSchema()
 
     // Check if thing exists
@@ -1004,8 +977,6 @@ export class DO<Env = unknown, State = unknown> {
    * Delete a thing by URL
    */
   async deleteThing(url: string): Promise<boolean> {
-    validateUrl(url)
-
     this.initSchema()
 
     // Check if thing exists
@@ -1186,8 +1157,6 @@ export class DO<Env = unknown, State = unknown> {
   async track<T extends Record<string, unknown>>(
     options: CreateEventOptions<T>
   ): Promise<Event<T>> {
-    validateTrackOptions(options)
-
     this.initSchema()
 
     const id = this.generateId()
@@ -1328,8 +1297,6 @@ export class DO<Env = unknown, State = unknown> {
   async relate<T extends Record<string, unknown> = Record<string, unknown>>(
     options: RelateOptions<T>
   ): Promise<Relationship<T>> {
-    validateRelateOptions(options)
-
     this.initSchema()
 
     const { type, from, to, data } = options
@@ -1391,10 +1358,6 @@ export class DO<Env = unknown, State = unknown> {
    * Remove a relationship between two things
    */
   async unrelate(from: string, type: string, to: string): Promise<boolean> {
-    validateUrl(from, 'from')
-    validateType(type)
-    validateUrl(to, 'to')
-
     this.initSchema()
 
     // Check if relationship exists
@@ -1630,8 +1593,6 @@ export class DO<Env = unknown, State = unknown> {
   async send<T extends Record<string, unknown> = Record<string, unknown>>(
     options: CreateActionOptions<T>
   ): Promise<Action<T>> {
-    validateSendOptions(options)
-
     this.initSchema()
 
     const id = this.generateId()
@@ -2078,8 +2039,6 @@ export class DO<Env = unknown, State = unknown> {
    * Store an artifact (cached content with optional TTL)
    */
   async storeArtifact<T>(options: StoreArtifactOptions<T>): Promise<Artifact<T>> {
-    validateStoreArtifactOptions(options)
-
     this.initSchema()
 
     const { key, type, source, sourceHash, content, ttl, metadata } = options
@@ -2120,8 +2079,6 @@ export class DO<Env = unknown, State = unknown> {
    * Get an artifact by key
    */
   async getArtifact<T = unknown>(key: string): Promise<Artifact<T> | null> {
-    validateArtifactKey(key)
-
     this.initSchema()
 
     const results = this.ctx.storage.sql
@@ -2599,54 +2556,6 @@ export class DO<Env = unknown, State = unknown> {
    */
   getCurrentTransportContext(): import('./types').TransportContext | null {
     return this._transportContext ?? null
-  }
-
-  /**
-   * Alias for getCurrentTransportContext
-   * @returns The current TransportContext or null if not set
-   */
-  getTransportContext(): import('./types').TransportContext | null {
-    return this._transportContext ?? null
-  }
-
-
-  /**
-   * Get the auth context for a specific WebSocket connection
-   * @param ws - The WebSocket to get auth for
-   * @returns The auth context or null if not found
-   */
-  getWebSocketAuth(ws: WebSocket): AuthContext | null {
-    const metadata = this.connections.get(ws)
-    return (metadata?.auth as AuthContext) ?? null
-  }
-
-  /**
-   * Set the auth context for a specific WebSocket connection
-   * @param ws - The WebSocket to set auth for
-   * @param auth - The auth context to set
-   */
-  setWebSocketAuth(ws: WebSocket, auth: AuthContext | null): void {
-    const metadata = this.connections.get(ws) ?? {}
-    if (auth) {
-      metadata.auth = auth
-      this.connections.set(ws, metadata)
-    } else {
-      delete metadata.auth
-      if (Object.keys(metadata).length === 0) {
-        this.connections.delete(ws)
-      } else {
-        this.connections.set(ws, metadata)
-      }
-    }
-  }
-
-  /**
-   * Get the WebSocket attachment (metadata) for a specific connection
-   * @param ws - The WebSocket to get attachment for
-   * @returns The attachment or null if not found
-   */
-  getWebSocketAttachment(ws: WebSocket): ConnectionMetadata | null {
-    return this.connections.get(ws) ?? null
   }
 
   /**
@@ -3372,21 +3281,6 @@ export class DO<Env = unknown, State = unknown> {
             ws,
           }
 
-          // Check if this is an auth message
-          if (data.type === 'auth') {
-            // Update stored auth for this WebSocket
-            const newAuth: AuthContext = {
-              ...(data.token && { token: data.token as string }),
-              ...(data.userId && { userId: data.userId as string }),
-              ...(data.organizationId && { organizationId: data.organizationId as string }),
-              ...(data.permissions && { permissions: data.permissions as string[] }),
-              ...(data.metadata && { metadata: data.metadata as Record<string, unknown> }),
-            }
-            this.setWebSocketAuth(ws, newAuth)
-            ws.send(JSON.stringify({ type: 'auth', status: 'ok' }))
-            return
-          }
-
           // Check if this is an RPC call
           if (data.method && typeof data.method === 'string') {
             const method = data.method as string
@@ -3456,127 +3350,44 @@ export class DO<Env = unknown, State = unknown> {
   // ============================================
 
   /**
-   * Parse JWT token and extract claims (without verification)
-   * In production, you should verify the signature with a secret key
-   * @param token - The JWT token to parse
-   * @returns The parsed claims or null if invalid
-   */
-  private parseJWT(token: string): Record<string, unknown> | null {
-    try {
-      const parts = token.split('.')
-      if (parts.length !== 3) {
-        return null
-      }
-
-      // Decode base64url payload (second part)
-      const payload = parts[1]
-      // Replace base64url characters with base64
-      const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
-      // Pad if necessary
-      const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=')
-
-      const decoded = atob(padded)
-      return JSON.parse(decoded) as Record<string, unknown>
-    } catch {
-      return null
-    }
-  }
-
-  /**
    * Extract auth context from request headers
    * @param request - The incoming request
    * @returns AuthContext or null if not authenticated
    */
   private extractAuthFromHeaders(request: Request): AuthContext | null {
-    // Prefer X-Auth-Context header for full context (highest priority)
+    const auth: AuthContext = {}
+    let hasAuth = false
+
+    // Extract Bearer token
+    const authHeader = request.headers.get('Authorization')
+    if (authHeader?.startsWith('Bearer ')) {
+      auth.token = authHeader.slice(7)
+      hasAuth = true
+    }
+
+    // Extract user ID from custom header
+    const userId = request.headers.get('X-User-ID')
+    if (userId) {
+      auth.userId = userId
+      hasAuth = true
+    }
+
+    // Extract organization ID from custom header
+    const orgId = request.headers.get('X-Organization-ID')
+    if (orgId) {
+      auth.organizationId = orgId
+      hasAuth = true
+    }
+
+    // Support full auth context via JSON header
     const authContextHeader = request.headers.get('X-Auth-Context')
     if (authContextHeader) {
       try {
         const parsed = JSON.parse(authContextHeader) as AuthContext
         return parsed
       } catch {
-        // Ignore parse errors and fall through to other methods
+        // Ignore parse errors
       }
-    }
-
-    const auth: AuthContext = {}
-    let hasAuth = false
-
-    // Extract Authorization header
-    const authHeader = request.headers.get('Authorization')
-    if (authHeader) {
-      if (authHeader.startsWith('Bearer ')) {
-        const token = authHeader.slice(7)
-        auth.token = token
-        hasAuth = true
-
-        // Try to parse JWT claims
-        const claims = this.parseJWT(token)
-        if (claims) {
-          // Extract standard JWT fields
-          if (claims.userId) {
-            auth.userId = String(claims.userId)
-          }
-          if (claims.sub && !auth.userId) {
-            auth.userId = String(claims.sub)
-          }
-          if (claims.permissions && Array.isArray(claims.permissions)) {
-            auth.permissions = claims.permissions as string[]
-          }
-          if (claims.organizationId) {
-            auth.organizationId = String(claims.organizationId)
-          }
-          if (claims.org && !auth.organizationId) {
-            auth.organizationId = String(claims.org)
-          }
-          // Store other claims in metadata
-          const metadata: Record<string, unknown> = {}
-          for (const [key, value] of Object.entries(claims)) {
-            if (!['userId', 'sub', 'permissions', 'organizationId', 'org', 'iat', 'exp', 'nbf', 'iss', 'aud'].includes(key)) {
-              metadata[key] = value
-            }
-          }
-          if (Object.keys(metadata).length > 0) {
-            auth.metadata = metadata
-          }
-        }
-      } else if (authHeader.startsWith('Basic ')) {
-        // Parse Basic auth
-        const credentials = authHeader.slice(6)
-        try {
-          const decoded = atob(credentials)
-          const colonIndex = decoded.indexOf(':')
-          if (colonIndex > 0) {
-            const userId = decoded.slice(0, colonIndex)
-            auth.userId = userId
-            auth.token = credentials
-            hasAuth = true
-          }
-        } catch {
-          // Ignore parse errors
-        }
-      }
-    }
-
-    // Extract X-API-Key header
-    const apiKey = request.headers.get('X-API-Key')
-    if (apiKey) {
-      auth.token = apiKey
-      hasAuth = true
-    }
-
-    // Extract user ID from custom header (lower priority)
-    const userId = request.headers.get('X-User-ID')
-    if (userId && !auth.userId) {
-      auth.userId = userId
-      hasAuth = true
-    }
-
-    // Extract organization ID from custom header (lower priority)
-    const orgId = request.headers.get('X-Organization-ID')
-    if (orgId && !auth.organizationId) {
-      auth.organizationId = orgId
-      hasAuth = true
     }
 
     return hasAuth ? auth : null
@@ -3634,33 +3445,17 @@ export class DO<Env = unknown, State = unknown> {
       })
     })
 
-    // RPC handler - supports both single and batch requests
+    // RPC handler
     app.post('/rpc', async (c) => {
       try {
-        const body = await c.req.json()
-
-        // Check if it's a batch request (array)
-        const isBatch = Array.isArray(body)
-        const requests = isBatch ? body : [body]
-
-        // Process all requests
-        const results = await Promise.all(
-          requests.map(async (req: any) => {
-            const { id, method, params, auth } = req
-
-            try {
-              // Use per-request auth if provided, otherwise use context auth
-              const authContext = auth ? (auth as AuthContext) : doInstance.getAuthContext()
-              const result = await this.invoke(method, params ?? [], authContext ?? undefined)
-              return { id, result }
-            } catch (err) {
-              return { id, error: err instanceof Error ? err.message : 'Unknown error' }
-            }
-          })
-        )
-
-        // Return batch or single result
-        return c.json(isBatch ? results : results[0])
+        const body = await c.req.json() as { id: string; method: string; params: unknown[] }
+        const { id, method, params } = body
+        try {
+          const result = await this.invoke(method, params)
+          return c.json({ id, result })
+        } catch (err) {
+          return c.json({ id, error: err instanceof Error ? err.message : 'Unknown error' })
+        }
       } catch {
         return c.json({ id: '', error: 'Invalid JSON' }, 400)
       }
@@ -3891,46 +3686,9 @@ function save() {
     // Handle WebSocket upgrades first (works on any path)
     const upgradeHeader = request.headers.get('Upgrade')
     if (upgradeHeader?.toLowerCase() === 'websocket') {
-      // Create WebSocket pair (check if WebSocketPair is available for test compatibility)
-      if (typeof WebSocketPair === 'undefined') {
-        return new Response('WebSocket not supported in this environment', { status: 501 })
-      }
+      // Create WebSocket pair
       const pair = new WebSocketPair()
       const [client, server] = Object.values(pair)
-
-      // Extract auth from upgrade request headers
-      let authContext = this.extractAuthFromHeaders(request)
-
-      // Also check query parameters for auth (common for browser WebSocket clients)
-      if (!authContext) {
-        const url = new URL(request.url)
-        const tokenFromQuery = url.searchParams.get('token')
-
-        if (tokenFromQuery) {
-          authContext = { token: tokenFromQuery }
-          // Try to parse as JWT
-          const claims = this.parseJWT(tokenFromQuery)
-          if (claims) {
-            if (claims.userId) {
-              authContext.userId = String(claims.userId)
-            }
-            if (claims.sub && !authContext.userId) {
-              authContext.userId = String(claims.sub)
-            }
-            if (claims.permissions && Array.isArray(claims.permissions)) {
-              authContext.permissions = claims.permissions as string[]
-            }
-            if (claims.organizationId) {
-              authContext.organizationId = String(claims.organizationId)
-            }
-          }
-        }
-      }
-
-      // Store auth for this WebSocket connection
-      if (authContext) {
-        this.connections.set(server, { auth: authContext })
-      }
 
       // Accept the WebSocket connection
       if (this.ctx.acceptWebSocket) {
