@@ -640,3 +640,91 @@ export type WebSocketErrorHandler = (
   ws: WebSocket,
   error: unknown
 ) => Promise<void>
+
+
+// ============================================================================
+// CDC Pipeline Types (Durable Execution)
+// ============================================================================
+
+/**
+ * Status of a CDC batch
+ */
+export type CDCBatchStatus = 'pending' | 'empty' | 'transformed' | 'completed' | 'failed' | 'skipped'
+
+/**
+ * CDC Batch record
+ */
+export interface CDCBatch {
+  /** Unique identifier */
+  id: string
+  /** Current status */
+  status: CDCBatchStatus
+  /** Number of events in the batch */
+  eventCount: number
+  /** Start of the time window */
+  startTime?: Date
+  /** End of the time window */
+  endTime?: Date
+  /** Event type filter used */
+  eventType?: string
+  /** When the batch was created */
+  createdAt: Date
+  /** Size of Parquet data (after transformation) */
+  parquetSize?: number
+  /** When the batch was transformed */
+  transformedAt?: Date
+  /** R2 key where data is stored (after output) */
+  r2Key?: string
+}
+
+/**
+ * Options for creating a CDC batch
+ */
+export interface CreateCDCBatchOptions {
+  /** Start of the time window */
+  startTime?: Date
+  /** End of the time window */
+  endTime?: Date
+  /** Filter by event type */
+  eventType?: string
+  /** Maximum number of events in the batch */
+  maxEvents?: number
+}
+
+/**
+ * Options for querying CDC batches
+ */
+export interface CDCBatchQueryOptions {
+  /** Filter by status */
+  status?: CDCBatchStatus
+  /** Limit number of results */
+  limit?: number
+  /** Offset for pagination */
+  offset?: number
+}
+
+/**
+ * Result of outputting to R2
+ */
+export interface R2OutputResult {
+  /** R2 key where data was stored */
+  key: string
+  /** Bucket name */
+  bucket: string
+  /** Size in bytes */
+  size: number
+}
+
+/**
+ * Result of full pipeline execution
+ */
+export interface CDCPipelineResult {
+  /** Batch ID */
+  batchId: string
+  /** Number of events processed */
+  eventCount: number
+  /** R2 key (if completed) */
+  r2Key?: string
+  /** Final status */
+  status: CDCBatchStatus
+}

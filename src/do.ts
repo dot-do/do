@@ -44,6 +44,7 @@ import type {
   ScheduleInterval,
   EventHandler,
   ScheduleHandler,
+  AuthContext,
 } from './types'
 
 // Placeholder types until we can import from agents package
@@ -75,10 +76,27 @@ type DurableObjectState = {
  * - Simple CRUD operations
  * - MCP tools for AI integration
  */
+/**
+ * Connection metadata for WebSocket tracking
+ */
+export interface ConnectionMetadata {
+  userId?: string
+  roomId?: string
+  status?: string
+  connectedAt?: Date
+  [key: string]: unknown
+}
+
 export class DO<Env = unknown, State = unknown> {
   protected ctx: DurableObjectState
   protected env: Env
   private schemaInitialized = false
+
+  // Auth context for the current request
+  private _authContext: AuthContext | undefined = undefined
+
+  // WebSocket connection tracking
+  connections: Map<WebSocket, ConnectionMetadata> = new Map()
 
   // Workflow handlers stored in memory (registered via registerWorkflowHandler)
   private workflowHandlers: Map<string, EventHandler> = new Map()
@@ -143,6 +161,12 @@ export class DO<Env = unknown, State = unknown> {
     'registerSchedule',
     'getWorkflowHandlers',
     'getSchedules',
+    // Auth operations
+    'getAuthContext',
+    'setAuthContext',
+    'checkPermission',
+    'requirePermission',
+    'getAuthMetadata',
   ])
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -294,8 +318,11 @@ export class DO<Env = unknown, State = unknown> {
 
   /**
    * Invoke a method by name
+   * @param method - The method name to invoke
+   * @param params - The parameters to pass to the method
+   * @param authContext - Optional auth context to use during invocation
    */
-  async invoke(method: string, params: unknown[]): Promise<unknown> {
+  async invoke(method: string, params: unknown[], authContext?: AuthContext): Promise<unknown> {
     if (!this.allowedMethods.has(method)) {
       throw new Error(`Method not allowed: ${method}`)
     }
@@ -305,7 +332,20 @@ export class DO<Env = unknown, State = unknown> {
       throw new Error(`Method not found: ${method}`)
     }
 
-    return (fn as (...args: unknown[]) => Promise<unknown>).apply(this, params)
+    // Save current auth context to restore after execution (isolation)
+    const previousAuthContext = this._authContext
+
+    try {
+      // Set auth context for this invocation if provided
+      if (authContext !== undefined) {
+        this._authContext = authContext
+      }
+
+      return await (fn as (...args: unknown[]) => Promise<unknown>).apply(this, params)
+    } finally {
+      // Restore previous auth context (or clear if none was set before)
+      this._authContext = previousAuthContext
+    }
   }
 
   // ============================================
@@ -2345,6 +2385,240 @@ export class DO<Env = unknown, State = unknown> {
   }
 
   // ============================================
+  // Auth Context Methods
+  // ============================================
+
+  /**
+   * Returns the auth context that was set via setAuthContext(), typically
+   * extracted from Authorization headers or WebSocket upgrade requests.
+   *
+   * This is used by methods to access the current user's authentication
+   * information during execution.
+   *
+   * @returns The current AuthContext or null if not authenticated
+   */
+  getAuthContext(): AuthContext | null {
+    return this._authContext ?? null
+  }
+
+  /**
+   * Set the auth context for the current request.
+   * This is typically called by transport handlers (HTTP, WebSocket, RPC)
+   * after extracting authentication information from the request.
+   *
+   * @param context - The auth context to set, or null to clear
+   */
+  setAuthContext(context: AuthContext | null): void {
+    this._authContext = context ?? undefined
+  }
+
+  /**
+   * Check if the current user has a specific permission
+   * @param permission - The permission to check
+   * @returns true if the user has the permission, false otherwise
+   */
+  checkPermission(permission: string): boolean {
+    const auth = this.getAuthContext()
+    if (!auth) {
+      return false
+    }
+    if (!auth.permissions || auth.permissions.length === 0) {
+      return false
+    }
+    return auth.permissions.includes(permission)
+  }
+
+  /**
+   * Require a specific permission, throwing an error if not present
+   * @param permission - The permission required
+   * @throws Error if the user doesn't have the permission
+   */
+  requirePermission(permission: string): void {
+    const auth = this.getAuthContext()
+    if (!auth) {
+      throw new Error('Authentication required')
+    }
+    if (!this.checkPermission(permission)) {
+      throw new Error('Permission denied')
+    }
+  }
+
+  /**
+   * Get a value from the auth context metadata
+   * @param key - The metadata key to retrieve
+   * @returns The value from metadata, or undefined if not found
+   */
+  getAuthMetadata<T = unknown>(key: string): T | undefined {
+    const auth = this.getAuthContext()
+    if (!auth || !auth.metadata) {
+      return undefined
+    }
+    return auth.metadata[key] as T | undefined
+  }
+
+  /**
+   * Create a scoped proxy with a fixed auth context.
+   * All operations on the returned proxy will use the provided auth context,
+   * regardless of any context set on the original instance.
+   *
+   * @param authContext - The auth context to use for all operations
+   * @returns A proxy that uses the fixed auth context
+   */
+  withAuth(authContext: AuthContext): this {
+    const target = this
+    return new Proxy(this, {
+      get(obj, prop, receiver) {
+        const value = Reflect.get(obj, prop, receiver)
+
+        // For getAuthContext, return the fixed auth context
+        if (prop === 'getAuthContext') {
+          return () => authContext
+        }
+
+        // For functions, wrap them to set auth context
+        if (typeof value === 'function') {
+          return function (this: unknown, ...args: unknown[]) {
+            // Set auth context before calling
+            target._authContext = authContext
+            try {
+              const result = value.apply(obj, args)
+              // Handle async functions
+              if (result instanceof Promise) {
+                return result.finally(() => {
+                  // Don't clear here - let the proxy maintain the context
+                })
+              }
+              return result
+            } catch (error) {
+              throw error
+            }
+          }
+        }
+
+        return value
+      },
+    }) as this
+  }
+
+  // ============================================
+  // WebSocket Connection Management
+  // ============================================
+
+  /**
+   * Register a WebSocket connection with metadata
+   * @param ws - The WebSocket to register
+   * @param metadata - Connection metadata (userId, roomId, etc.)
+   */
+  async registerConnection(ws: WebSocket, metadata: ConnectionMetadata = {}): Promise<void> {
+    this.connections.set(ws, {
+      ...metadata,
+      connectedAt: new Date(),
+    })
+  }
+
+  /**
+   * Get metadata for a specific connection
+   * @param ws - The WebSocket to get metadata for
+   * @returns The connection metadata or undefined if not found
+   */
+  getConnectionMetadata(ws: WebSocket): ConnectionMetadata | undefined {
+    return this.connections.get(ws)
+  }
+
+  /**
+   * Update metadata for a connection
+   * @param ws - The WebSocket to update
+   * @param metadata - The metadata updates to apply
+   */
+  async updateConnectionMetadata(ws: WebSocket, metadata: Partial<ConnectionMetadata>): Promise<void> {
+    const existing = this.connections.get(ws)
+    if (existing) {
+      this.connections.set(ws, { ...existing, ...metadata })
+    }
+  }
+
+  /**
+   * Get all connections, optionally filtered
+   * @param filter - Optional filter function or object with properties to match
+   * @returns Array of [WebSocket, metadata] pairs
+   */
+  getConnections(filter?: ((metadata: ConnectionMetadata) => boolean) | Partial<ConnectionMetadata>): [WebSocket, ConnectionMetadata][] {
+    const entries = Array.from(this.connections.entries())
+    if (!filter) {
+      return entries
+    }
+
+    if (typeof filter === 'function') {
+      return entries.filter(([, metadata]) => filter(metadata))
+    }
+
+    // Object-based filter: match all properties
+    return entries.filter(([, metadata]) => {
+      for (const [key, value] of Object.entries(filter)) {
+        if (metadata[key] !== value) {
+          return false
+        }
+      }
+      return true
+    })
+  }
+
+  /**
+   * Broadcast a message to all connections, optionally filtered
+   * @param message - The message to send
+   * @param filter - Optional filter function or object to select connections
+   */
+  async broadcast(message: string | ArrayBuffer, filter?: ((metadata: ConnectionMetadata) => boolean) | Partial<ConnectionMetadata>): Promise<void> {
+    const connections = this.getConnections(filter)
+    for (const [ws] of connections) {
+      try {
+        ws.send(message)
+      } catch {
+        // Connection may have closed, will be cleaned up on next close event
+      }
+    }
+  }
+
+  /**
+   * Close and remove all connections
+   */
+  async destroyAllConnections(): Promise<void> {
+    for (const [ws] of this.connections) {
+      try {
+        ws.close()
+      } catch {
+        // Ignore close errors
+      }
+    }
+    this.connections.clear()
+  }
+
+  /**
+   * Find connections matching metadata criteria
+   * @param criteria - Object with properties to match
+   * @returns Array of WebSockets matching the criteria
+   */
+  findConnectionsByMetadata(criteria: Partial<ConnectionMetadata>): WebSocket[] {
+    return this.getConnections(criteria).map(([ws]) => ws)
+  }
+
+  /**
+   * Get the number of active connections
+   * @returns The number of tracked connections
+   */
+  getConnectionCount(): number {
+    return this.connections.size
+  }
+
+  /**
+   * Get all active WebSocket connections
+   * @returns Array of all tracked WebSockets
+   */
+  getActiveConnections(): WebSocket[] {
+    return Array.from(this.connections.keys())
+  }
+
+  // ============================================
   // WebSocket Hibernation
   // ============================================
 
@@ -2352,11 +2626,15 @@ export class DO<Env = unknown, State = unknown> {
    * Handle incoming WebSocket message
    */
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
-    // TODO: Implement WebSocket message handling
+    // Default implementation - subclasses can override
   }
 
   /**
-   * Handle WebSocket close
+   * Handle WebSocket close - cleans up connection state
+   * @param ws - The WebSocket that closed
+   * @param code - The close code
+   * @param reason - The close reason
+   * @param wasClean - Whether the close was clean
    */
   async webSocketClose(
     ws: WebSocket,
@@ -2364,7 +2642,8 @@ export class DO<Env = unknown, State = unknown> {
     reason: string,
     wasClean: boolean
   ): Promise<void> {
-    // TODO: Implement WebSocket close handling
+    // Clean up connection tracking
+    this.connections.delete(ws)
   }
 
   /**
@@ -2379,10 +2658,66 @@ export class DO<Env = unknown, State = unknown> {
   // ============================================
 
   /**
+   * Extract auth context from request headers
+   * @param request - The incoming request
+   * @returns AuthContext or null if not authenticated
+   */
+  private extractAuthFromHeaders(request: Request): AuthContext | null {
+    const auth: AuthContext = {}
+    let hasAuth = false
+
+    // Extract Bearer token
+    const authHeader = request.headers.get('Authorization')
+    if (authHeader?.startsWith('Bearer ')) {
+      auth.token = authHeader.slice(7)
+      hasAuth = true
+    }
+
+    // Extract user ID from custom header
+    const userId = request.headers.get('X-User-ID')
+    if (userId) {
+      auth.userId = userId
+      hasAuth = true
+    }
+
+    // Extract organization ID from custom header
+    const orgId = request.headers.get('X-Organization-ID')
+    if (orgId) {
+      auth.organizationId = orgId
+      hasAuth = true
+    }
+
+    // Support full auth context via JSON header
+    const authContextHeader = request.headers.get('X-Auth-Context')
+    if (authContextHeader) {
+      try {
+        const parsed = JSON.parse(authContextHeader) as AuthContext
+        return parsed
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
+    return hasAuth ? auth : null
+  }
+
+  /**
    * Create Hono router with all routes
    */
   private createRouter(): Hono {
     const app = new Hono()
+    const doInstance = this
+
+    // Auth extraction middleware - sets auth context for all requests
+    app.use('*', async (c, next) => {
+      const authContext = doInstance.extractAuthFromHeaders(c.req.raw)
+      if (authContext) {
+        doInstance.setAuthContext(authContext)
+      }
+      await next()
+      // Clear auth after request completes
+      doInstance.setAuthContext(null)
+    })
 
     // Health check
     app.get('/health', (c) => c.json({ status: 'ok' }))
