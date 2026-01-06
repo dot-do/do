@@ -1,6 +1,6 @@
 ---
 active: true
-iteration: 1
+iteration: 3
 max_iterations: 50
 completion_promise: "ALL_ISSUES_CLOSED_TESTS_PASSING"
 started_at: "2026-01-06T18:10:26Z"

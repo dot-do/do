@@ -1,20 +1,23 @@
-import { defineConfig } from 'vitest/config'
+import { defineWorkersConfig } from '@cloudflare/vitest-pool-workers/config'
 
-export default defineConfig({
+export default defineWorkersConfig({
   test: {
     include: ['test/**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/dist/**'],
-    environment: 'node',
-    // Memory and concurrency limits to prevent runaway resource usage
-    pool: 'forks',
+    testTimeout: 10000,
+    hookTimeout: 10000,
+    // Run test files sequentially to prevent memory exhaustion
+    fileParallelism: false,
+    // Limit concurrent tests within each file
+    maxConcurrency: 1,
     poolOptions: {
-      forks: {
-        singleFork: true, // Run all tests in a single fork to limit memory
+      workers: {
+        singleWorker: true,
+        // Disable isolated storage at the workers level
+        // Required for Durable Objects with SQLite storage
+        isolatedStorage: false,
+        wrangler: { configPath: './wrangler.jsonc' },
       },
     },
-    maxConcurrency: 1, // Run tests sequentially
-    testTimeout: 10000, // 10s timeout per test
-    hookTimeout: 10000,
-    isolate: false, // Share context between tests to reduce memory
   },
 })

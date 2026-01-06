@@ -15,6 +15,7 @@
 
 import { Hono } from 'hono'
 import { z } from 'zod'
+import { DurableObject } from 'cloudflare:workers'
 
 // ============================================
 // Zod Schemas for JSON.parse Validation
@@ -160,9 +161,8 @@ interface ConnectionInfo {
   subscriptions: Set<string>
 }
 
-export class DO<Env = unknown, _State = unknown> {
-  protected ctx: DurableObjectState
-  protected env: Env
+export class DO<Env = unknown> extends DurableObject<Env> {
+  // ctx and env are provided by DurableObject base class
   private schemaInitialized = false
 
   // Workflow handlers stored in memory (registered via registerWorkflowHandler)
@@ -236,8 +236,7 @@ export class DO<Env = unknown, _State = unknown> {
   ])
 
   constructor(ctx: DurableObjectState, env: Env) {
-    this.ctx = ctx
-    this.env = env
+    super(ctx, env)
   }
 
   /**
