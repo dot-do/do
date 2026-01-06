@@ -126,8 +126,8 @@ export class DO<Env = unknown, State = unknown> {
   // Event emitter for connection events
   private eventHandlers: Map<string, Array<(data: unknown) => void>> = new Map()
 
-  // Cached Hono router instance
-  private _cachedRouter: Hono | null = null
+  // Cached Hono router instance (eagerly initialized in constructor)
+  private _router: Hono | null = null
 
   // Workflow handlers stored in memory (registered via registerWorkflowHandler)
   private workflowHandlers: Map<string, EventHandler> = new Map()
@@ -210,6 +210,8 @@ export class DO<Env = unknown, State = unknown> {
   constructor(ctx: DurableObjectState, env: Env) {
     this.ctx = ctx
     this.env = env
+    // Eagerly initialize the router - avoids creating new router on every request
+    this._router = this.createRouter()
   }
 
   /**
@@ -403,8 +405,11 @@ export class DO<Env = unknown, State = unknown> {
         this._authContext = authContext
       }
 
-      // Set transport context to workers-rpc
-      this._transportContext = { type: 'workers-rpc' }
+      // Set transport context to workers-rpc ONLY if not already set
+      // (if called from HTTP/WebSocket middleware, keep that transport context)
+      if (!this._transportContext) {
+        this._transportContext = { type: 'workers-rpc' }
+      }
 
       return await (fn as (...args: unknown[]) => Promise<unknown>).apply(this, params)
     } finally {
@@ -436,7 +441,12 @@ export class DO<Env = unknown, State = unknown> {
     }
 
     const row = results[0] as { data: string }
-    return JSON.parse(row.data) as T
+    try {
+      return JSON.parse(row.data) as T
+    } catch {
+      // Return null for corrupted/malformed JSON data (graceful degradation)
+      return null
+    }
   }
 
   /**
@@ -460,7 +470,15 @@ export class DO<Env = unknown, State = unknown> {
       .exec(query, collection, limit, offset)
       .toArray()
 
-    return results.map((row) => JSON.parse((row as { data: string }).data) as T)
+    const documents = results.map((row) => JSON.parse((row as { data: string }).data) as T)
+
+    // Filter by organizationId if auth context has one
+    const auth = this.getAuthContext()
+    if (auth?.organizationId) {
+      return documents.filter((doc) => (doc as unknown as { _organization?: string })._organization === auth.organizationId)
+    }
+
+    return documents
   }
 
   /**
@@ -847,8 +865,15 @@ export class DO<Env = unknown, State = unknown> {
     const url = options.url ?? this.generateThingUrl(options.ns, options.type, id)
     const now = new Date().toISOString()
 
+    // Add auth metadata to data if available
+    const auth = this.getAuthContext()
+    const authMetadata = {
+      ...(auth?.userId && { _createdBy: auth.userId }),
+      ...(auth?.organizationId && { _organization: auth.organizationId }),
+    }
+
     const dataToStore = {
-      data: options.data,
+      data: { ...options.data, ...authMetadata },
       '@context': options['@context'],
     }
 
@@ -868,7 +893,7 @@ export class DO<Env = unknown, State = unknown> {
       type: options.type,
       id,
       url,
-      data: options.data,
+      data: { ...options.data, ...authMetadata },
       createdAt: new Date(now),
       updatedAt: new Date(now),
       '@context': options['@context'],
@@ -1186,7 +1211,17 @@ export class DO<Env = unknown, State = unknown> {
   async track<T extends Record<string, unknown>>(
     options: CreateEventOptions<T>
   ): Promise<Event<T>> {
-    validateTrackOptions(options)
+    // Early validation for undefined options
+    if (!options) {
+      throw new ValidationError('options is required', 'options')
+    }
+
+    // Auto-populate source from auth context if not provided
+    const auth = this.getAuthContext()
+    const source = options.source ?? auth?.userId ?? 'unknown'
+
+    // Validate options with source populated
+    validateTrackOptions({ ...options, source })
 
     this.initSchema()
 
@@ -1198,7 +1233,7 @@ export class DO<Env = unknown, State = unknown> {
       id,
       options.type,
       timestamp.toISOString(),
-      options.source,
+      source,
       JSON.stringify(options.data),
       options.correlationId ?? null,
       options.causationId ?? null
@@ -1208,7 +1243,7 @@ export class DO<Env = unknown, State = unknown> {
       id,
       type: options.type,
       timestamp,
-      source: options.source,
+      source,
       data: options.data,
       correlationId: options.correlationId,
       causationId: options.causationId,
@@ -1630,7 +1665,17 @@ export class DO<Env = unknown, State = unknown> {
   async send<T extends Record<string, unknown> = Record<string, unknown>>(
     options: CreateActionOptions<T>
   ): Promise<Action<T>> {
-    validateSendOptions(options)
+    // Early validation for undefined options
+    if (!options) {
+      throw new ValidationError('options is required', 'options')
+    }
+
+    // Auto-populate actor from auth context if not provided
+    const auth = this.getAuthContext()
+    const actor = options.actor ?? auth?.userId ?? 'unknown'
+
+    // Validate options with actor populated
+    validateSendOptions({ ...options, actor })
 
     this.initSchema()
 
@@ -1641,7 +1686,7 @@ export class DO<Env = unknown, State = unknown> {
       `INSERT INTO actions (id, actor, object, action, status, metadata, created_at, updated_at)
        VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)`,
       id,
-      options.actor,
+      actor,
       options.object,
       options.action,
       options.metadata ? JSON.stringify(options.metadata) : null,
@@ -1651,7 +1696,7 @@ export class DO<Env = unknown, State = unknown> {
 
     return {
       id,
-      actor: options.actor,
+      actor,
       object: options.object,
       action: options.action,
       status: 'pending',
@@ -2221,23 +2266,17 @@ export class DO<Env = unknown, State = unknown> {
 
     const now = new Date().toISOString()
 
-    // Get count of expired artifacts before deletion
-    const expiredResults = this.ctx.storage.sql
+    // Delete expired artifacts and get count of deleted rows
+    const deleteResults = this.ctx.storage.sql
       .exec(
-        'SELECT COUNT(*) as count FROM artifacts WHERE expires_at IS NOT NULL AND expires_at < ?',
+        'DELETE FROM artifacts WHERE expires_at IS NOT NULL AND expires_at < ?',
         now
       )
       .toArray()
 
-    const count = (expiredResults[0] as { count: number })?.count ?? 0
+    const deletedCount = (deleteResults[0] as { deleted: number })?.deleted ?? 0
 
-    // Delete expired artifacts
-    this.ctx.storage.sql.exec(
-      'DELETE FROM artifacts WHERE expires_at IS NOT NULL AND expires_at < ?',
-      now
-    )
-
-    return count
+    return deletedCount
   }
 
   // ============================================
@@ -3944,10 +3983,7 @@ function save() {
       })
     }
 
-    // Route HTTP requests through Hono (use cached router)
-    if (!this._cachedRouter) {
-      this._cachedRouter = this.createRouter()
-    }
-    return this._cachedRouter.fetch(request)
+    // Route HTTP requests through Hono (router is eagerly initialized in constructor)
+    return this._router!.fetch(request)
   }
 }

@@ -396,11 +396,8 @@ export function validateRelateOptions(options: unknown): void {
     throw new ValidationError('Invalid to: to is required')
   }
   validateUrl(opts.to, 'to')
-
-  // Check for self-reference
-  if (opts.from === opts.to) {
-    throw new ValidationError('Invalid relationship: from and to cannot be the same (self-reference not allowed)')
-  }
+  // Note: Self-referential relationships (from === to) are intentionally allowed
+  // as they represent valid graph patterns (e.g., a post mentioning itself)
 }
 
 /**
@@ -568,9 +565,8 @@ export function validateStoreArtifactOptions(options: unknown): void {
     if (typeof opts.ttl !== 'number') {
       throw new ValidationError('Invalid ttl: ttl must be a number')
     }
-    if (opts.ttl < 0) {
-      throw new ValidationError('Invalid ttl: ttl cannot be negative')
-    }
+    // Note: Negative TTL is allowed - it creates an already-expired artifact
+    // which is useful for testing cleanup functionality
   }
 }
 

@@ -14,6 +14,8 @@
 
 export { DO } from './do'
 export { ValidationError } from './validation'
+export { GitStore } from './gitx'
 export * from './types'
 export * from './rpc'
 export * from './mcp'
+export * from './storage'

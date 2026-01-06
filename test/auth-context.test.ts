@@ -59,6 +59,14 @@ function createMockCtx() {
               if (row) {
                 results.push({ data: row.data })
               }
+            } else if (table && query.includes('WHERE collection = ?')) {
+              // Handle list() queries
+              const [collection] = params as [string]
+              for (const [key, row] of table.entries()) {
+                if (key.startsWith(`${collection}:`)) {
+                  results.push({ data: row.data })
+                }
+              }
             }
           }
 
