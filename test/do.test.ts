@@ -9,7 +9,113 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { DO } from '../src/do'
 import type { ListOptions, SearchOptions, FetchOptions, DoOptions } from '../src/types'
 
-// Mock execution context
+/**
+ * Create an in-memory SQLite mock for testing
+ * This simulates the Cloudflare Durable Objects SQLite storage API
+ */
+function createMockSqlStorage() {
+  // In-memory storage using a Map
+  const tables: Map<string, Map<string, Record<string, unknown>>> = new Map()
+
+  return {
+    exec(query: string, ...params: unknown[]) {
+      const results: unknown[] = []
+
+      // Parse and execute simple SQL queries
+      const normalizedQuery = query.trim().toUpperCase()
+
+      if (normalizedQuery.startsWith('CREATE TABLE')) {
+        // CREATE TABLE - just initialize the table if needed
+        const tableMatch = query.match(/CREATE TABLE IF NOT EXISTS (\w+)/i)
+        if (tableMatch) {
+          const tableName = tableMatch[1]
+          if (!tables.has(tableName)) {
+            tables.set(tableName, new Map())
+          }
+        }
+      } else if (normalizedQuery.startsWith('INSERT')) {
+        // INSERT INTO documents (collection, id, data) VALUES (?, ?, ?)
+        const [collection, id, data] = params as [string, string, string]
+        const tableName = 'documents'
+        if (!tables.has(tableName)) {
+          tables.set(tableName, new Map())
+        }
+        const table = tables.get(tableName)!
+        const key = `${collection}:${id}`
+        table.set(key, { collection, id, data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      } else if (normalizedQuery.startsWith('SELECT')) {
+        // SELECT data FROM documents WHERE collection = ? AND id = ?
+        const tableName = 'documents'
+        const table = tables.get(tableName)
+
+        if (table) {
+          if (query.includes('WHERE collection = ? AND id = ?')) {
+            const [collection, id] = params as [string, string]
+            const key = `${collection}:${id}`
+            const row = table.get(key)
+            if (row) {
+              results.push({ data: row.data })
+            }
+          } else if (query.includes('WHERE collection = ?')) {
+            // List query with pagination
+            const [collection, limit, offset] = params as [string, number, number]
+            const matching: Record<string, unknown>[] = []
+            for (const [key, row] of table.entries()) {
+              if (key.startsWith(`${collection}:`)) {
+                matching.push({ data: row.data })
+              }
+            }
+            // Apply pagination
+            const paginated = matching.slice(offset, offset + limit)
+            results.push(...paginated)
+          }
+        }
+      } else if (normalizedQuery.startsWith('UPDATE')) {
+        // UPDATE documents SET data = ?, updated_at = CURRENT_TIMESTAMP WHERE collection = ? AND id = ?
+        const [data, collection, id] = params as [string, string, string]
+        const tableName = 'documents'
+        const table = tables.get(tableName)
+        if (table) {
+          const key = `${collection}:${id}`
+          const existing = table.get(key)
+          if (existing) {
+            table.set(key, { ...existing, data, updated_at: new Date().toISOString() })
+          }
+        }
+      } else if (normalizedQuery.startsWith('DELETE')) {
+        // DELETE FROM documents WHERE collection = ? AND id = ?
+        const [collection, id] = params as [string, string]
+        const tableName = 'documents'
+        const table = tables.get(tableName)
+        if (table) {
+          const key = `${collection}:${id}`
+          table.delete(key)
+        }
+      }
+
+      return {
+        toArray() {
+          return results
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Create a mock context with SQLite storage
+ */
+function createMockCtx() {
+  return {
+    waitUntil: vi.fn(),
+    passThroughOnException: vi.fn(),
+    storage: {
+      sql: createMockSqlStorage()
+    }
+  }
+}
+
+// Mock execution context (without storage, for tests that don't need it)
 const mockCtx = {
   waitUntil: vi.fn(),
   passThroughOnException: vi.fn(),
@@ -44,11 +150,51 @@ describe('DO Base Class', () => {
     })
   })
 
-  describe('RpcTarget Implementation', () => {
+  describe('allowedMethods Set', () => {
     let doInstance: DO
 
     beforeEach(() => {
       doInstance = new DO(mockCtx as any, mockEnv)
+    })
+
+    it('should have allowedMethods property as a Set', () => {
+      expect(doInstance.allowedMethods).toBeDefined()
+      expect(doInstance.allowedMethods).toBeInstanceOf(Set)
+    })
+
+    it('should contain CRUD methods in allowedMethods Set', () => {
+      expect(doInstance.allowedMethods.has('get')).toBe(true)
+      expect(doInstance.allowedMethods.has('list')).toBe(true)
+      expect(doInstance.allowedMethods.has('create')).toBe(true)
+      expect(doInstance.allowedMethods.has('update')).toBe(true)
+      expect(doInstance.allowedMethods.has('delete')).toBe(true)
+    })
+
+    it('should contain MCP tool methods in allowedMethods Set', () => {
+      expect(doInstance.allowedMethods.has('search')).toBe(true)
+      expect(doInstance.allowedMethods.has('fetch')).toBe(true)
+      expect(doInstance.allowedMethods.has('do')).toBe(true)
+    })
+
+    it('should NOT contain dangerous methods in allowedMethods Set', () => {
+      expect(doInstance.allowedMethods.has('constructor')).toBe(false)
+      expect(doInstance.allowedMethods.has('__proto__')).toBe(false)
+      expect(doInstance.allowedMethods.has('toString')).toBe(false)
+    })
+
+    it('should use allowedMethods Set in hasMethod implementation', () => {
+      // hasMethod should check against allowedMethods Set
+      for (const method of doInstance.allowedMethods) {
+        expect(doInstance.hasMethod(method)).toBe(true)
+      }
+    })
+  })
+
+  describe('RpcTarget Implementation', () => {
+    let doInstance: DO
+
+    beforeEach(() => {
+      doInstance = new DO(createMockCtx() as any, mockEnv)
     })
 
     it('should return true for allowed methods', () => {
@@ -76,7 +222,8 @@ describe('DO Base Class', () => {
     it('should invoke allowed methods via invoke()', async () => {
       const result = await doInstance.invoke('get', ['users', '123'])
       // Result depends on implementation, but should not throw for allowed methods
-      expect(result).toBeDefined()
+      // Returns null for non-existent document
+      expect(result).toBeNull()
     })
 
     it('should throw for disallowed methods via invoke()', async () => {
@@ -89,7 +236,7 @@ describe('DO Base Class', () => {
     let doInstance: DO
 
     beforeEach(() => {
-      doInstance = new DO(mockCtx as any, mockEnv)
+      doInstance = new DO(createMockCtx() as any, mockEnv)
     })
 
     describe('get()', () => {
@@ -201,7 +348,7 @@ describe('DO Base Class', () => {
     let doInstance: DO
 
     beforeEach(() => {
-      doInstance = new DO(mockCtx as any, mockEnv)
+      doInstance = new DO(createMockCtx() as any, mockEnv)
     })
 
     describe('search()', () => {
@@ -232,7 +379,8 @@ describe('DO Base Class', () => {
         const result = await doInstance.fetch('https://example.com')
         expect(result).toBeDefined()
         expect(result.status).toBeDefined()
-        expect(result.url).toBe('https://example.com')
+        // URL might include trailing slash after redirect
+        expect(result.url).toMatch(/^https:\/\/example\.com\/?$/)
       })
 
       it('should support custom options', async () => {
@@ -331,6 +479,31 @@ describe('DO Base Class', () => {
       })
       const response = await doInstance.handleRequest(request)
       expect(response.status).toBe(101) // Switching Protocols
+    })
+
+    it('should route WebSocket upgrade to any path', async () => {
+      // WebSocket upgrades should work on any path, not just /ws
+      const request = new Request('http://localhost/api/stream', {
+        headers: { Upgrade: 'websocket' },
+      })
+      const response = await doInstance.handleRequest(request)
+      expect(response.status).toBe(101)
+    })
+
+    it('should include WebSocket in response for upgrade requests', async () => {
+      const request = new Request('http://localhost/ws', {
+        headers: { Upgrade: 'websocket' },
+      })
+      const response = await doInstance.handleRequest(request)
+      expect(response.webSocket).toBeDefined()
+    })
+
+    it('should accept WebSocket with case-insensitive Upgrade header', async () => {
+      const request = new Request('http://localhost/ws', {
+        headers: { 'upgrade': 'websocket' },
+      })
+      const response = await doInstance.handleRequest(request)
+      expect(response.status).toBe(101)
     })
 
     it('should route /mcp requests to MCP handler', async () => {
