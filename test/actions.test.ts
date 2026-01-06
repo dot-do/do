@@ -50,8 +50,36 @@ function createMockSqlStorage() {
             const key = `${collection}:${id}`
             table.set(key, { collection, id, data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
           } else if (tableName === 'actions') {
-            const [id, actor, object, action, status, metadata] = params as [string, string, string, string, string, string]
-            table.set(id, { id, actor, object, action, status, metadata, created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+            // Handle both send() and doAction() parameter structures
+            // send: VALUES (?, ?, ?, ?, 'pending', ?, ?, ?) - id, actor, object, action, metadata, created_at, updated_at
+            // doAction: VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?) - id, actor, object, action, metadata, created_at, updated_at, started_at
+            const [id, actor, object, action, metadata, created_at, updated_at, started_at] = params as [
+              string,
+              string,
+              string,
+              string,
+              string | null,
+              string,
+              string,
+              string?
+            ]
+            // Extract status from the query itself ('pending' or 'active')
+            const statusMatch = query.match(/'(pending|active)'/)
+            const status = statusMatch ? statusMatch[1] : 'pending'
+            table.set(id, {
+              id,
+              actor,
+              object,
+              action,
+              status,
+              metadata,
+              created_at,
+              updated_at,
+              started_at: started_at ?? null,
+              completed_at: null,
+              result: null,
+              error: null,
+            })
           }
         }
       } else if (normalizedQuery.startsWith('SELECT')) {
@@ -61,11 +89,76 @@ function createMockSqlStorage() {
           const table = tables.get(tableName)
 
           if (table) {
-            if (query.includes('WHERE id = ?')) {
-              const [id] = params as [string]
-              const row = table.get(id)
-              if (row) {
-                results.push(row)
+            if (tableName === 'actions') {
+              // Handle action queries
+              if (query.includes('WHERE id = ?')) {
+                const [id] = params as [string]
+                const row = table.get(id)
+                if (row) {
+                  results.push(row)
+                }
+              } else {
+                // Handle queryActions with filters
+                let filteredRows = Array.from(table.values())
+
+                // Parse WHERE conditions
+                const whereMatch = query.match(/WHERE\s+(.+?)\s+ORDER BY/i)
+                if (whereMatch) {
+                  const whereClause = whereMatch[1]
+                  let paramIndex = 0
+
+                  // Check for actor filter
+                  if (whereClause.includes('actor = ?')) {
+                    const actor = params[paramIndex] as string
+                    filteredRows = filteredRows.filter((row: Record<string, unknown>) => row.actor === actor)
+                    paramIndex++
+                  }
+
+                  // Check for object filter
+                  if (whereClause.includes('object = ?')) {
+                    const object = params[paramIndex] as string
+                    filteredRows = filteredRows.filter((row: Record<string, unknown>) => row.object === object)
+                    paramIndex++
+                  }
+
+                  // Check for action filter
+                  if (whereClause.includes('action = ?')) {
+                    const actionFilter = params[paramIndex] as string
+                    filteredRows = filteredRows.filter((row: Record<string, unknown>) => row.action === actionFilter)
+                    paramIndex++
+                  }
+
+                  // Check for status filter (single or IN clause)
+                  if (whereClause.includes('status IN')) {
+                    const inMatch = whereClause.match(/status IN \(([^)]+)\)/)
+                    if (inMatch) {
+                      const placeholderCount = (inMatch[1].match(/\?/g) || []).length
+                      const statuses = params.slice(paramIndex, paramIndex + placeholderCount) as string[]
+                      filteredRows = filteredRows.filter((row: Record<string, unknown>) =>
+                        statuses.includes(row.status as string)
+                      )
+                      paramIndex += placeholderCount
+                    }
+                  } else if (whereClause.includes('status = ?')) {
+                    const status = params[paramIndex] as string
+                    filteredRows = filteredRows.filter((row: Record<string, unknown>) => row.status === status)
+                    paramIndex++
+                  }
+                }
+
+                // Sort by created_at ASC
+                filteredRows.sort((a: Record<string, unknown>, b: Record<string, unknown>) =>
+                  (a.created_at as string).localeCompare(b.created_at as string)
+                )
+
+                // Handle LIMIT and OFFSET (last two params)
+                const limitIndex = params.length - 2
+                const offsetIndex = params.length - 1
+                const limit = params[limitIndex] as number
+                const offset = params[offsetIndex] as number
+
+                filteredRows = filteredRows.slice(offset, offset + limit)
+                results.push(...filteredRows)
               }
             } else if (query.includes('WHERE collection = ? AND id = ?')) {
               const [collection, id] = params as [string, string]
@@ -84,16 +177,41 @@ function createMockSqlStorage() {
           const table = tables.get(tableName)
 
           if (table && tableName === 'actions') {
-            // Handle different update patterns
-            if (query.includes('SET status = ?')) {
-              const statusIndex = 0
-              const idIndex = params.length - 1
-              const status = params[statusIndex] as string
-              const id = params[idIndex] as string
-              const existing = table.get(id)
-              if (existing) {
-                table.set(id, { ...existing, status, updated_at: new Date().toISOString() })
+            // Get the id (always the last param)
+            const id = params[params.length - 1] as string
+            const existing = table.get(id)
+            if (existing) {
+              const updates: Record<string, unknown> = {}
+
+              // Parse the SET clause to extract column assignments
+              // startAction: status = ?, started_at = ?, updated_at = ?
+              // completeAction: status = ?, result = ?, completed_at = ?, updated_at = ?
+              // failAction: status = ?, error = ?, completed_at = ?, updated_at = ?
+              // cancelAction: status = ?, completed_at = ?, updated_at = ?
+              // retryAction: status = ?, started_at = ?, completed_at = NULL, error = NULL, result = NULL, metadata = ?, updated_at = ?
+              // resetAction: status = ?, started_at = NULL, completed_at = NULL, error = NULL, result = NULL, metadata = ?, updated_at = ?
+
+              // Extract SET clause
+              const setMatch = query.match(/SET\s+(.+?)\s+WHERE/i)
+              if (setMatch) {
+                const setClause = setMatch[1]
+                const assignments = setClause.split(',').map((s) => s.trim())
+                let paramIndex = 0
+
+                for (const assignment of assignments) {
+                  const [col, val] = assignment.split('=').map((s) => s.trim())
+                  const columnName = col.toLowerCase()
+
+                  if (val === '?') {
+                    updates[columnName] = params[paramIndex]
+                    paramIndex++
+                  } else if (val === 'NULL') {
+                    updates[columnName] = null
+                  }
+                }
               }
+
+              table.set(id, { ...existing, ...updates })
             }
           }
         }

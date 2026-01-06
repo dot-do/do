@@ -79,27 +79,107 @@ function createMockSqlStorage() {
           })
         }
       } else if (normalizedQuery.startsWith('SELECT')) {
-        const tableName = 'documents'
-        const table = tables.get(tableName)
+        // Handle events table SELECT
+        if (query.includes('FROM events')) {
+          const eventsTable = tables.get('events')
+          if (eventsTable) {
+            // Get all events first
+            let allEvents = Array.from(eventsTable.values())
 
-        if (table) {
-          if (query.includes('WHERE collection = ? AND id = ?')) {
-            const [collection, id] = params as [string, string]
-            const key = `${collection}:${id}`
-            const row = table.get(key)
-            if (row) {
-              results.push({ data: row.data })
-            }
-          } else if (query.includes('WHERE collection = ?')) {
-            const [collection, limit, offset] = params as [string, number, number]
-            const matching: Record<string, unknown>[] = []
-            for (const [key, row] of table.entries()) {
-              if (key.startsWith(`${collection}:`)) {
-                matching.push({ data: row.data })
+            // Apply WHERE conditions if present
+            if (query.includes('WHERE')) {
+              // Parse conditions - each condition consumes one param
+              // The order of conditions in the query matches the order in params
+              // We need to extract them in the order they appear in the query
+              const whereStart = query.indexOf('WHERE')
+              const orderStart = query.indexOf('ORDER')
+              const wherePart = query.substring(whereStart, orderStart > 0 ? orderStart : undefined)
+
+              // Track position in params array
+              let paramIndex = 0
+
+              // Check each condition in the order they might appear in our implementation
+              if (wherePart.includes('type = ?')) {
+                const typeValue = params[paramIndex++] as string
+                allEvents = allEvents.filter((e) => e.type === typeValue)
+              }
+              if (wherePart.includes('source = ?')) {
+                const sourceValue = params[paramIndex++] as string
+                allEvents = allEvents.filter((e) => e.source === sourceValue)
+              }
+              if (wherePart.includes('correlation_id = ?')) {
+                const corrValue = params[paramIndex++] as string
+                allEvents = allEvents.filter((e) => e.correlationId === corrValue)
+              }
+              if (wherePart.includes('timestamp > ?')) {
+                const afterValue = params[paramIndex++] as string
+                allEvents = allEvents.filter((e) => (e.timestamp as string) > afterValue)
+              }
+              if (wherePart.includes('timestamp < ?')) {
+                const beforeValue = params[paramIndex++] as string
+                allEvents = allEvents.filter((e) => (e.timestamp as string) < beforeValue)
+              }
+              // Check for exact id match (not correlation_id or causation_id)
+              if (wherePart.match(/\bid = \?/)) {
+                const idValue = params[paramIndex++] as string
+                allEvents = allEvents.filter((e) => e.id === idValue)
               }
             }
-            const paginated = matching.slice(offset, offset + limit)
-            results.push(...paginated)
+
+            // Sort by timestamp ASC
+            allEvents.sort((a, b) =>
+              (a.timestamp as string).localeCompare(b.timestamp as string)
+            )
+
+            // Apply LIMIT and OFFSET
+            const limitMatch = query.match(/LIMIT\s+\?/i)
+            const offsetMatch = query.match(/OFFSET\s+\?/i)
+            if (limitMatch || offsetMatch) {
+              // Find the last two params for limit and offset
+              const totalParams = params.length
+              const offset = offsetMatch ? (params[totalParams - 1] as number) : 0
+              const limit = limitMatch ? (params[totalParams - 2] as number) : allEvents.length
+              allEvents = allEvents.slice(offset, offset + limit)
+            }
+
+            // Return with column names matching our schema
+            results.push(
+              ...allEvents.map((e) => ({
+                id: e.id,
+                type: e.type,
+                timestamp: e.timestamp,
+                source: e.source,
+                data: e.data,
+                correlation_id: e.correlationId,
+                causation_id: e.causationId,
+              }))
+            )
+          }
+        }
+        // Handle documents table SELECT
+        else {
+          const tableName = 'documents'
+          const table = tables.get(tableName)
+
+          if (table) {
+            if (query.includes('WHERE collection = ? AND id = ?')) {
+              const [collection, id] = params as [string, string]
+              const key = `${collection}:${id}`
+              const row = table.get(key)
+              if (row) {
+                results.push({ data: row.data })
+              }
+            } else if (query.includes('WHERE collection = ?')) {
+              const [collection, limit, offset] = params as [string, number, number]
+              const matching: Record<string, unknown>[] = []
+              for (const [key, row] of table.entries()) {
+                if (key.startsWith(`${collection}:`)) {
+                  matching.push({ data: row.data })
+                }
+              }
+              const paginated = matching.slice(offset, offset + limit)
+              results.push(...paginated)
+            }
           }
         }
       } else if (normalizedQuery.startsWith('UPDATE')) {

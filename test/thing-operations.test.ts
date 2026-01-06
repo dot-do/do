@@ -71,6 +71,56 @@ function createMockSqlStorage() {
                   break
                 }
               }
+            } else if (query.includes('ORDER BY') && query.includes('LIMIT')) {
+              // Handle list query with optional WHERE conditions
+              let filteredRows = Array.from(table.values())
+
+              // Parse WHERE conditions if present
+              const whereMatch = query.match(/WHERE\s+(.+?)\s+ORDER BY/i)
+              if (whereMatch) {
+                const conditions = whereMatch[1]
+                let paramIndex = 0
+
+                // Filter by ns
+                if (conditions.includes('ns = ?')) {
+                  const nsValue = params[paramIndex++] as string
+                  filteredRows = filteredRows.filter(row => row.ns === nsValue)
+                }
+
+                // Filter by type
+                if (conditions.includes('type = ?')) {
+                  const typeValue = params[paramIndex++] as string
+                  filteredRows = filteredRows.filter(row => row.type === typeValue)
+                }
+
+                // Filter by data.* fields (json_extract)
+                const jsonExtractMatches = conditions.matchAll(/json_extract\(data,\s*'\$.data\.(\w+)'\)\s*=\s*\?/g)
+                for (const match of jsonExtractMatches) {
+                  const fieldName = match[1]
+                  const fieldValue = params[paramIndex++]
+                  filteredRows = filteredRows.filter(row => {
+                    try {
+                      const parsed = JSON.parse(row.data as string)
+                      return parsed.data?.[fieldName] === fieldValue
+                    } catch {
+                      return false
+                    }
+                  })
+                }
+              }
+
+              // Get limit and offset from the end of params
+              const limit = params[params.length - 2] as number
+              const offset = params[params.length - 1] as number
+
+              // Sort by created_at DESC
+              filteredRows.sort((a, b) =>
+                new Date(b.created_at as string).getTime() - new Date(a.created_at as string).getTime()
+              )
+
+              // Apply offset and limit
+              const sliced = filteredRows.slice(offset, offset + limit)
+              results.push(...sliced)
             }
           }
         } else {
