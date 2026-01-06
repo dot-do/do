@@ -463,6 +463,9 @@ export interface WorkflowContext {
   /** Log message */
   log: (message: string, data?: unknown) => void
 
+  /** Flush pending state changes to storage */
+  flush: () => Promise<void>
+
   /** Access to database */
   db?: DOClientExtended
 }

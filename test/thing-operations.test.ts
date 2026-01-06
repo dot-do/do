@@ -1,8 +1,8 @@
 /**
- * @dotdo/do - Thing Operations Tests (RED Phase - Phase 11 Graph Operations)
+ * @dotdo/do - Thing Operations Tests (GREEN Phase - Phase 11 Graph Operations)
  *
- * These tests define the expected behavior of Thing operations following the DOClient interface.
- * They should FAIL initially (RED), then pass after implementation (GREEN).
+ * These tests verify the behavior of Thing operations following the DOClient interface.
+ * Implementation is complete - all tests should pass.
  *
  * Thing operations use EntityId (ns/type/id) addressing and URL-based retrieval,
  * providing graph database semantics for linked data.
@@ -35,13 +35,14 @@ function createMockSqlStorage() {
       } else if (normalizedQuery.startsWith('INSERT')) {
         // Handle both documents and things tables
         if (query.includes('things')) {
-          const [ns, type, id, url, data] = params as [string, string, string, string, string]
+          // INSERT INTO things (ns, type, id, url, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+          const [ns, type, id, url, data, created_at, updated_at] = params as [string, string, string, string, string, string, string]
           const tableName = 'things'
           if (!tables.has(tableName)) {
             tables.set(tableName, new Map())
           }
           const table = tables.get(tableName)!
-          table.set(url, { ns, type, id, url, data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+          table.set(url, { ns, type, id, url, data, created_at, updated_at })
         } else {
           const [collection, id, data] = params as [string, string, string]
           const tableName = 'documents'
@@ -51,6 +52,18 @@ function createMockSqlStorage() {
           const table = tables.get(tableName)!
           const key = `${collection}:${id}`
           table.set(key, { collection, id, data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        }
+      } else if (normalizedQuery.startsWith('UPDATE')) {
+        // Handle UPDATE things SET data = ?, updated_at = ? WHERE url = ?
+        if (query.includes('things')) {
+          const [data, updated_at, url] = params as [string, string, string]
+          const table = tables.get('things')
+          if (table) {
+            const existing = table.get(url)
+            if (existing) {
+              table.set(url, { ...existing, data, updated_at })
+            }
+          }
         }
       } else if (normalizedQuery.startsWith('SELECT')) {
         // Handle things table queries

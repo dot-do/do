@@ -2,19 +2,19 @@
  * @dotdo/do/rpc - RPC Layer
  *
  * Implements RpcTarget pattern with capnweb-style HTTP/WS support.
- * Also exports JSON-RPC 2.0 compliant server/client implementation.
  */
 
 import type { RpcRequest } from '../types'
 
-// Re-export JSON-RPC 2.0 module
-export * from './json-rpc'
+/** Method handler type for RPC methods */
+type RpcMethodHandler = (...args: unknown[]) => Promise<unknown>
 
 /**
  * Base class for RPC targets
  */
 export class RpcTarget {
   protected allowedMethods = new Set<string>()
+  private methodHandlers = new Map<string, RpcMethodHandler>()
 
   /**
    * Check if a method is allowed
@@ -31,20 +31,27 @@ export class RpcTarget {
       throw new Error(`Method not allowed: ${method}`)
     }
 
-    const fn = (this as unknown as Record<string, unknown>)[method]
-    if (typeof fn !== 'function') {
-      throw new Error(`Method not found: ${method}`)
+    // First check if there's a registered handler
+    const fn = this.methodHandlers.get(method)
+    if (fn) {
+      return fn.apply(this, params)
     }
 
-    return (fn as (...args: unknown[]) => Promise<unknown>).apply(this, params)
+    // Then check if the method exists directly on the instance
+    const instanceMethod = (this as unknown as Record<string, unknown>)[method]
+    if (typeof instanceMethod === 'function') {
+      return instanceMethod.apply(this, params)
+    }
+
+    throw new Error(`Method not found: ${method}`)
   }
 
   /**
    * Register a method
    */
-  protected registerMethod(name: string, handler: (...args: unknown[]) => Promise<unknown>): void {
+  protected registerMethod(name: string, handler: RpcMethodHandler): void {
     this.allowedMethods.add(name)
-    ;(this as unknown as Record<string, unknown>)[name] = handler
+    this.methodHandlers.set(name, handler)
   }
 }
 

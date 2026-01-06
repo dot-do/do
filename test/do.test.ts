@@ -1,11 +1,11 @@
 /**
- * @dotdo/do - Core DO Class Tests (RED Phase)
+ * @dotdo/do - Core DO Class Tests (GREEN Phase)
  *
- * These tests define the expected behavior of the DO base class.
- * They should FAIL initially (RED), then pass after implementation (GREEN).
+ * These tests define and verify the behavior of the DO base class.
+ * Implementation is complete - all tests should pass.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { DO } from '../src/do'
 import type { ListOptions, SearchOptions, FetchOptions, DoOptions } from '../src/types'
 
@@ -525,15 +525,44 @@ describe('DO Base Class', () => {
     })
 
     describe('fetch()', () => {
+      let originalFetch: typeof globalThis.fetch
+
+      beforeEach(() => {
+        originalFetch = globalThis.fetch
+      })
+
+      afterEach(() => {
+        globalThis.fetch = originalFetch
+      })
+
       it('should fetch URL and return result', async () => {
+        // Mock fetch to avoid network dependency
+        globalThis.fetch = vi.fn().mockResolvedValue(
+          new Response('<!DOCTYPE html><html><body>Example</body></html>', {
+            status: 200,
+            headers: { 'content-type': 'text/html' },
+          })
+        )
+
         const result = await doInstance.fetch('https://example.com')
         expect(result).toBeDefined()
-        expect(result.status).toBeDefined()
-        // URL might include trailing slash after redirect
-        expect(result.url).toMatch(/^https:\/\/example\.com\/?$/)
+        expect(result.status).toBe(200)
+        expect(result.url).toBe('https://example.com')
+        expect(globalThis.fetch).toHaveBeenCalledWith(
+          'https://example.com',
+          expect.objectContaining({ method: 'GET' })
+        )
       })
 
       it('should support custom options', async () => {
+        // Mock fetch for POST request
+        globalThis.fetch = vi.fn().mockResolvedValue(
+          new Response('{"success": true}', {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })
+        )
+
         const options: FetchOptions = {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -541,10 +570,31 @@ describe('DO Base Class', () => {
         }
         const result = await doInstance.fetch('https://example.com/api', options)
         expect(result).toBeDefined()
+        expect(result.status).toBe(200)
+        expect(globalThis.fetch).toHaveBeenCalledWith(
+          'https://example.com/api',
+          expect.objectContaining({ method: 'POST' })
+        )
       })
 
       it('should handle fetch errors gracefully', async () => {
+        // Mock fetch to return error response
+        globalThis.fetch = vi.fn().mockResolvedValue(
+          new Response('Not Found', {
+            status: 404,
+            statusText: 'Not Found',
+          })
+        )
+
         const result = await doInstance.fetch('https://invalid-url-that-does-not-exist.invalid')
+        expect(result.status).toBe(404)
+      })
+
+      it('should handle network errors gracefully', async () => {
+        // Mock fetch to throw network error
+        globalThis.fetch = vi.fn().mockRejectedValue(new Error('Network error'))
+
+        const result = await doInstance.fetch('https://example.com')
         expect(result.status).toBeGreaterThanOrEqual(400)
       })
 

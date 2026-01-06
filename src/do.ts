@@ -14,28 +14,88 @@
  */
 
 import { Hono } from 'hono'
-import {
-  ValidationError,
-  validateCollection,
-  validateId,
-  validateData,
-  validateUpdates,
-  validateListOptions,
-  validateUrl,
-  validateNamespace,
-  validateType,
-  validateCreateThingOptions,
-  validateRelateOptions,
-  validateTrackOptions,
-  validateSendOptions,
-  validateStoreArtifactOptions,
-  validateArtifactKey,
-  validateSearchQuery,
-  validateSearchOptions,
-  validateInvokeMethod,
-  validateInvokeParams,
-  validateDataId,
-} from './validation'
+import { z } from 'zod'
+
+// ============================================
+// Zod Schemas for JSON.parse Validation
+// ============================================
+
+/**
+ * Schema for parsed Document objects from database
+ * Documents must have an id and can have any additional properties
+ */
+const DocumentSchema = z.object({
+  id: z.string(),
+}).passthrough()
+
+/**
+ * Schema for parsed Thing data from database
+ * The data field contains the nested structure with data and optional @context
+ */
+const ThingDataSchema = z.object({
+  data: z.record(z.string(), z.unknown()),
+  '@context': z.union([z.string(), z.record(z.string(), z.unknown())]).optional(),
+}).passthrough()
+
+/**
+ * Schema for parsed Event data - can be any object
+ */
+const EventDataSchema = z.record(z.string(), z.unknown())
+
+/**
+ * Schema for parsed Artifact content - can be any JSON value
+ */
+const ArtifactContentSchema = z.unknown()
+
+/**
+ * Schema for parsed Artifact metadata - must be an object if present
+ */
+const ArtifactMetadataSchema = z.record(z.string(), z.unknown())
+
+/**
+ * Schema for parsed Workflow context - must be an object
+ */
+const WorkflowContextSchema = z.record(z.string(), z.unknown())
+
+/**
+ * Schema for parsed Workflow history - must be an array
+ */
+const WorkflowHistorySchema = z.array(z.object({
+  timestamp: z.number(),
+  type: z.enum(['event', 'schedule', 'transition', 'action']),
+  name: z.string(),
+  data: z.unknown().optional(),
+}))
+
+/**
+ * Safely parse JSON and validate with Zod schema
+ * Returns null if parsing or validation fails
+ */
+function safeJsonParse<T>(json: string, schema: z.ZodType<T>): T | null {
+  try {
+    const parsed = JSON.parse(json)
+    const result = schema.safeParse(parsed)
+    return result.success ? result.data : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Allowlist of valid column names for ORDER BY clauses.
+ * This prevents SQL injection attacks through the orderBy parameter.
+ * Only columns from the documents table are allowed.
+ */
+const ALLOWED_ORDER_COLUMNS = new Set([
+  'id',
+  'collection',
+  'data',
+  'created_at',
+  'updated_at',
+  'createdAt',
+  'updatedAt',
+])
+
 import type {
   ListOptions,
   Document,
@@ -66,7 +126,6 @@ import type {
   ScheduleInterval,
   EventHandler,
   ScheduleHandler,
-  AuthContext,
 } from './types'
 
 // Placeholder types until we can import from agents package
@@ -94,14 +153,11 @@ type DurableObjectState = {
  * - MCP tools for AI integration
  */
 /**
- * Connection metadata for WebSocket tracking
+ * Connection metadata stored for each WebSocket
  */
-export interface ConnectionMetadata {
-  userId?: string
-  roomId?: string
-  status?: string
-  connectedAt?: Date
-  [key: string]: unknown
+interface ConnectionInfo {
+  id: string
+  subscriptions: Set<string>
 }
 
 export class DO<Env = unknown, _State = unknown> {
@@ -109,25 +165,15 @@ export class DO<Env = unknown, _State = unknown> {
   protected env: Env
   private schemaInitialized = false
 
-  // Auth context for the current request
-  private _authContext: AuthContext | undefined = undefined
-
-  // Transport context for the current request
-  private _transportContext: import('./types').TransportContext | undefined = undefined
-
-  // WebSocket connection tracking
-  connections: Map<WebSocket, ConnectionMetadata> = new Map()
-
-  // Event emitter for connection events
-  private eventHandlers: Map<string, Array<(data: unknown) => void>> = new Map()
-
-  // Cached Hono router instance (eagerly initialized in constructor)
-  private _router: Hono | null = null
-
   // Workflow handlers stored in memory (registered via registerWorkflowHandler)
   private workflowHandlers: Map<string, EventHandler> = new Map()
   // Workflow schedules stored in memory (registered via registerSchedule)
   private workflowSchedules: Array<{ interval: ScheduleInterval; handler: ScheduleHandler }> = []
+
+  // WebSocket connection tracking
+  private connections: Map<WebSocket, ConnectionInfo> = new Map()
+  // Topic -> Set of subscribed WebSockets
+  private subscribers: Map<string, Set<WebSocket>> = new Map()
 
   /**
    * Allowlist of methods that can be invoked via RPC.
@@ -187,26 +233,11 @@ export class DO<Env = unknown, _State = unknown> {
     'registerSchedule',
     'getWorkflowHandlers',
     'getSchedules',
-    // CDC operations
-    'createCDCBatch',
-    'getCDCBatch',
-    'queryCDCBatches',
-    'transformToParquet',
-    'outputToR2',
-    'processCDCPipeline',
-    // Auth operations
-    'getAuthContext',
-    'setAuthContext',
-    'checkPermission',
-    'requirePermission',
-    'getAuthMetadata',
   ])
 
   constructor(ctx: DurableObjectState, env: Env) {
     this.ctx = ctx
     this.env = env
-    // Eagerly initialize the router - avoids creating new router on every request
-    this._router = this.createRouter()
   }
 
   /**
@@ -276,7 +307,8 @@ export class DO<Env = unknown, _State = unknown> {
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
         started_at TEXT,
-        completed_at TEXT
+        completed_at TEXT,
+        scheduled_for TEXT
       )
     `)
 
@@ -296,6 +328,38 @@ export class DO<Env = unknown, _State = unknown> {
 
     this.ctx.storage.sql.exec(`
       CREATE INDEX IF NOT EXISTS idx_artifacts_source ON artifacts(source, type)
+    `)
+
+    // Events table indexes for timestamp and type queries
+    this.ctx.storage.sql.exec(`
+      CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp)
+    `)
+
+    this.ctx.storage.sql.exec(`
+      CREATE INDEX IF NOT EXISTS idx_events_type ON events(type)
+    `)
+
+    // Actions table indexes for status and scheduled_for queries
+    this.ctx.storage.sql.exec(`
+      CREATE INDEX IF NOT EXISTS idx_actions_status ON actions(status)
+    `)
+
+    this.ctx.storage.sql.exec(`
+      CREATE INDEX IF NOT EXISTS idx_actions_scheduled_for ON actions(scheduled_for)
+    `)
+
+    // Documents table index for collection (namespace) lookups
+    this.ctx.storage.sql.exec(`
+      CREATE INDEX IF NOT EXISTS idx_documents_collection ON documents(collection)
+    `)
+
+    // Things table indexes for ns and type lookups
+    this.ctx.storage.sql.exec(`
+      CREATE INDEX IF NOT EXISTS idx_things_ns ON things(ns)
+    `)
+
+    this.ctx.storage.sql.exec(`
+      CREATE INDEX IF NOT EXISTS idx_things_type ON things(type)
     `)
 
     this.ctx.storage.sql.exec(`
@@ -330,26 +394,6 @@ export class DO<Env = unknown, _State = unknown> {
       )
     `)
 
-
-    this.ctx.storage.sql.exec(`
-      CREATE TABLE IF NOT EXISTS cdc_batches (
-        id TEXT PRIMARY KEY,
-        status TEXT NOT NULL DEFAULT 'pending',
-        event_count INTEGER NOT NULL,
-        start_time TEXT,
-        end_time TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        transformed_at TEXT,
-        completed_at TEXT,
-        parquet_size INTEGER,
-        r2_key TEXT
-      )
-    `)
-
-    this.ctx.storage.sql.exec(`
-      CREATE INDEX IF NOT EXISTS idx_cdc_batches_status ON cdc_batches(status)
-    `)
-
     this.schemaInitialized = true
   }
 
@@ -373,45 +417,21 @@ export class DO<Env = unknown, _State = unknown> {
 
   /**
    * Invoke a method by name
-   * @param method - The method name to invoke
-   * @param params - The parameters to pass to the method
-   * @param authContext - Optional auth context to use during invocation
    */
-  async invoke(method: string, params: unknown[], authContext?: AuthContext): Promise<unknown> {
-    validateInvokeMethod(method)
-    validateInvokeParams(params)
-
+  async invoke(method: string, params: unknown[]): Promise<unknown> {
     if (!this.allowedMethods.has(method)) {
       throw new Error(`Method not allowed: ${method}`)
     }
 
-    const fn = (this as unknown as Record<string, unknown>)[method]
+    // Use indexed access on the class prototype chain
+    // Safe because we've verified the method is in our allowedMethods set
+    const target = this as Record<string, unknown>
+    const fn = target[method]
     if (typeof fn !== 'function') {
       throw new Error(`Method not found: ${method}`)
     }
 
-    // Save current contexts to restore after execution (isolation)
-    const previousAuthContext = this._authContext
-    const previousTransportContext = this._transportContext
-
-    try {
-      // Set auth context for this invocation if provided
-      if (authContext !== undefined) {
-        this._authContext = authContext
-      }
-
-      // Set transport context to workers-rpc ONLY if not already set
-      // (if called from HTTP/WebSocket middleware, keep that transport context)
-      if (!this._transportContext) {
-        this._transportContext = { type: 'workers-rpc' }
-      }
-
-      return await (fn as (...args: unknown[]) => Promise<unknown>).apply(this, params)
-    } finally {
-      // Restore previous contexts (or clear if none was set before)
-      this._authContext = previousAuthContext
-      this._transportContext = previousTransportContext
-    }
+    return fn.apply(this, params)
   }
 
   // ============================================
@@ -422,9 +442,6 @@ export class DO<Env = unknown, _State = unknown> {
    * Get a document by ID
    */
   async get<T extends Document>(collection: string, id: string): Promise<T | null> {
-    validateCollection(collection)
-    validateId(id)
-
     this.initSchema()
 
     const results = this.ctx.storage.sql
@@ -436,27 +453,30 @@ export class DO<Env = unknown, _State = unknown> {
     }
 
     const row = results[0] as { data: string }
-    try {
-      return JSON.parse(row.data) as T
-    } catch {
-      // Return null for corrupted/malformed JSON data (graceful degradation)
+    // Use Zod validation for parsed document data
+    const parsed = safeJsonParse(row.data, DocumentSchema)
+    if (parsed === null) {
+      // Return null for corrupted/invalid JSON data or schema validation failure
       return null
     }
+    return parsed as T
   }
 
   /**
    * List documents in a collection
    */
   async list<T extends Document>(collection: string, options?: ListOptions): Promise<T[]> {
-    validateCollection(collection)
-    validateListOptions(options)
-
     this.initSchema()
 
     const limit = options?.limit ?? 100
     const offset = options?.offset ?? 0
     const orderBy = options?.orderBy ?? 'created_at'
     const order = options?.order ?? 'asc'
+
+    // Validate orderBy column to prevent SQL injection
+    if (!ALLOWED_ORDER_COLUMNS.has(orderBy)) {
+      throw new Error(`Invalid orderBy column: ${orderBy}`)
+    }
 
     // Build query with ordering and pagination
     const query = `SELECT data FROM documents WHERE collection = ? ORDER BY ${orderBy} ${order.toUpperCase()} LIMIT ? OFFSET ?`
@@ -465,37 +485,26 @@ export class DO<Env = unknown, _State = unknown> {
       .exec(query, collection, limit, offset)
       .toArray()
 
-    const documents = results.map((row) => JSON.parse((row as { data: string }).data) as T)
-
-    // Filter by organizationId if auth context has one
-    const auth = this.getAuthContext()
-    if (auth?.organizationId) {
-      return documents.filter((doc) => (doc as unknown as { _organization?: string })._organization === auth.organizationId)
-    }
-
-    return documents
+    // Use Zod validation for each parsed document
+    return results
+      .map((row) => safeJsonParse((row as { data: string }).data, DocumentSchema))
+      .filter((doc): doc is T => doc !== null)
   }
 
   /**
    * Create a new document
    */
-  async create<T extends Document>(collection: string, doc: Partial<T>): Promise<T> {
-    validateCollection(collection)
-    validateData(doc)
-    validateDataId(doc as Record<string, unknown>)
-
+  async create<T extends Document>(collection: string, doc: Omit<T, 'id'> | T): Promise<T> {
     this.initSchema()
 
-    // Generate ID if not provided
-    const id = doc.id ?? crypto.randomUUID()
-
-    // Add auth metadata if available
-    const auth = this.getAuthContext()
+    // Use provided id or generate a new one
+    const id = (doc as T).id ?? this.generateId()
+    const now = new Date().toISOString()
     const document = {
       ...doc,
       id,
-      ...(auth?.userId && { _createdBy: auth.userId }),
-      ...(auth?.organizationId && { _organization: auth.organizationId }),
+      createdAt: now,
+      updatedAt: now,
     } as T
 
     this.ctx.storage.sql.exec(
@@ -516,10 +525,6 @@ export class DO<Env = unknown, _State = unknown> {
     id: string,
     updates: Partial<T>
   ): Promise<T | null> {
-    validateCollection(collection)
-    validateId(id)
-    validateUpdates(updates)
-
     this.initSchema()
 
     // Get existing document first
@@ -528,12 +533,14 @@ export class DO<Env = unknown, _State = unknown> {
       return null
     }
 
-    // Add auth metadata if available
-    const auth = this.getAuthContext()
-    const authMetadata = auth?.userId ? { _updatedBy: auth.userId } : {}
-
-    // Merge updates with existing document
-    const updated = { ...existing, ...updates, ...authMetadata, id } as T
+    // Merge updates with existing document and update timestamp
+    const now = new Date().toISOString()
+    const updated = {
+      ...existing,
+      ...updates,
+      id,
+      updatedAt: now,
+    } as T
 
     this.ctx.storage.sql.exec(
       'UPDATE documents SET data = ?, updated_at = CURRENT_TIMESTAMP WHERE collection = ? AND id = ?',
@@ -549,21 +556,7 @@ export class DO<Env = unknown, _State = unknown> {
    * Delete a document
    */
   async delete(collection: string, id: string): Promise<boolean> {
-    validateCollection(collection)
-    validateId(id)
-
     this.initSchema()
-
-    // Check auth for protected collections
-    if (collection === 'protected_data') {
-      const auth = this.getAuthContext()
-      if (!auth) {
-        throw new Error('Authentication required')
-      }
-      if (!this.checkPermission('delete')) {
-        throw new Error('Permission denied')
-      }
-    }
 
     // Check if document exists first
     const existing = await this.get(collection, id)
@@ -588,9 +581,6 @@ export class DO<Env = unknown, _State = unknown> {
    * Search across collections using SQLite LIKE
    */
   async search(query: string, options?: SearchOptions): Promise<SearchResult[]> {
-    validateSearchQuery(query)
-    validateSearchOptions(options)
-
     this.initSchema()
 
     const limit = options?.limit ?? 100
@@ -628,24 +618,29 @@ export class DO<Env = unknown, _State = unknown> {
         .toArray() as { collection: string; id: string; data: string }[]
     }
 
-    // Transform results with relevance scoring
-    const searchResults: SearchResult[] = results.map((row) => {
-      const document = JSON.parse(row.data) as Document
-      // Calculate a simple relevance score based on match count
-      const dataStr = row.data.toLowerCase()
-      const queryLower = query.toLowerCase()
-      // Escape special regex characters
-      const escapedQuery = queryLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      const matchCount = (dataStr.match(new RegExp(escapedQuery, 'g')) || []).length
-      const score = matchCount / Math.max(dataStr.length / 100, 1)
+    // Transform results with relevance scoring, using Zod validation
+    const searchResults: SearchResult[] = results
+      .map((row) => {
+        const document = safeJsonParse(row.data, DocumentSchema)
+        if (document === null) {
+          return null // Skip invalid documents
+        }
+        // Calculate a simple relevance score based on match count
+        const dataStr = row.data.toLowerCase()
+        const queryLower = query.toLowerCase()
+        // Escape special regex characters
+        const escapedQuery = queryLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const matchCount = (dataStr.match(new RegExp(escapedQuery, 'g')) || []).length
+        const score = matchCount / Math.max(dataStr.length / 100, 1)
 
-      return {
-        id: row.id,
-        collection: row.collection,
-        score,
-        document,
-      }
-    })
+        return {
+          id: row.id,
+          collection: row.collection,
+          score,
+          document,
+        }
+      })
+      .filter((result): result is SearchResult => result !== null)
 
     // Sort by score descending
     searchResults.sort((a, b) => b.score - a.score)
@@ -654,9 +649,18 @@ export class DO<Env = unknown, _State = unknown> {
   }
 
   /**
-   * Fetch a URL using global fetch() and return result
+   * Fetch method with two signatures:
+   * 1. fetch(request: Request) - Cloudflare Workers DO fetch handler
+   * 2. fetch(target: string, options?: FetchOptions) - MCP tool for fetching URLs
    */
-  async fetch(target: string, options?: FetchOptions): Promise<FetchResult> {
+  async fetch(requestOrTarget: Request | string, options?: FetchOptions): Promise<Response | FetchResult> {
+    // If first argument is a Request, handle as Workers fetch handler
+    if (requestOrTarget instanceof Request) {
+      return this.handleRequest(requestOrTarget)
+    }
+
+    // Otherwise, handle as URL fetch tool
+    const target = requestOrTarget
     const method = options?.method ?? 'GET'
     const headers = options?.headers ?? {}
     const timeout = options?.timeout ?? 30000
@@ -731,57 +735,142 @@ export class DO<Env = unknown, _State = unknown> {
   }
 
   /**
-   * Execute code in sandbox (via ai-evaluate)
-   * Returns mock result for now - real implementation comes with ai-evaluate integration
+   * Execute code in a secure sandbox with restricted scope.
+   * Only safe globals are exposed (Math, Date, JSON, Object, Array, String, Number, Boolean, etc.)
+   * Dangerous globals (process, require, eval, Function, globalThis, etc.) are explicitly undefined.
    */
   async do(code: string, options?: DoOptions): Promise<DoResult> {
     const startTime = Date.now()
+    const logs: string[] = []
 
     try {
-      // Mock execution for now
-      // In real implementation, this will use ai-evaluate for sandboxed execution
-      let result: unknown
-      const logs: string[] = []
-
-      // Very simple mock evaluation for basic expressions
-      // SECURITY NOTE: This is a placeholder - real implementation must use ai-evaluate
-      if (code.startsWith('return ')) {
-        const expression = code.slice(7).trim()
-
-        // Only evaluate simple arithmetic for the mock
-        if (/^[\d\s+\-*/().]+$/.test(expression)) {
-          // Safe arithmetic evaluation
-          result = Function(`"use strict"; return (${expression})`)()
-        } else if (expression === 'true') {
-          result = true
-        } else if (expression === 'false') {
-          result = false
-        } else if (expression === 'null') {
-          result = null
-        } else if (/^["'].*["']$/.test(expression)) {
-          result = expression.slice(1, -1)
-        } else if (expression.startsWith('process.env.')) {
-          // Return mock env value for testing
-          const envKey = expression.slice(12)
-          result = options?.env?.[envKey] ?? undefined
-        } else {
-          // For complex expressions, return mock result
-          result = { mock: true, code, message: 'ai-evaluate integration pending' }
-        }
-      } else if (code.includes('throw ')) {
-        // Simulate error handling
-        const errorMatch = code.match(/throw new Error\(["'](.*)["']\)/)
-        const errorMessage = errorMatch ? errorMatch[1] : 'Unknown error'
-        return {
-          success: false,
-          error: errorMessage,
-          logs,
-          duration: Date.now() - startTime,
-        }
-      } else {
-        // Default mock result for other code
-        result = { mock: true, code, message: 'ai-evaluate integration pending' }
+      // Create a restricted sandbox scope with only safe operations
+      const safeScope: Record<string, unknown> = {
+        // Safe built-in objects
+        Math,
+        Date,
+        JSON,
+        Object,
+        Array,
+        String,
+        Number,
+        Boolean,
+        RegExp,
+        Error,
+        TypeError,
+        RangeError,
+        SyntaxError,
+        URIError,
+        Map,
+        Set,
+        WeakMap,
+        WeakSet,
+        Promise,
+        Symbol,
+        BigInt,
+        Infinity,
+        NaN,
+        isNaN,
+        isFinite,
+        parseFloat,
+        parseInt,
+        encodeURI,
+        decodeURI,
+        encodeURIComponent,
+        decodeURIComponent,
+        // Safe constants
+        undefined,
+        // Explicitly block dangerous globals by setting to undefined
+        globalThis: undefined,
+        global: undefined,
+        window: undefined,
+        self: undefined,
+        process: undefined,
+        require: undefined,
+        module: undefined,
+        exports: undefined,
+        __dirname: undefined,
+        __filename: undefined,
+        // Note: 'eval', 'import', and 'arguments' are reserved words in strict mode
+        // and cannot be used as parameter names. They're blocked by strict mode itself.
+        Function: undefined,
+        setTimeout: undefined,
+        setInterval: undefined,
+        setImmediate: undefined,
+        clearTimeout: undefined,
+        clearInterval: undefined,
+        clearImmediate: undefined,
+        fetch: undefined,
+        WebSocket: undefined,
+        XMLHttpRequest: undefined,
+        Worker: undefined,
+        SharedWorker: undefined,
+        Blob: undefined,
+        File: undefined,
+        FileReader: undefined,
+        URL: undefined,
+        URLSearchParams: undefined,
+        Headers: undefined,
+        Request: undefined,
+        Response: undefined,
+        FormData: undefined,
+        AbortController: undefined,
+        AbortSignal: undefined,
+        TextEncoder: undefined,
+        TextDecoder: undefined,
+        atob: undefined,
+        btoa: undefined,
+        crypto: undefined,
+        Crypto: undefined,
+        SubtleCrypto: undefined,
+        navigator: undefined,
+        location: undefined,
+        history: undefined,
+        document: undefined,
+        localStorage: undefined,
+        sessionStorage: undefined,
+        indexedDB: undefined,
+        caches: undefined,
+        Deno: undefined,
+        Bun: undefined,
+        // Block prototype pollution vectors
+        __proto__: undefined,
+        constructor: undefined,
+        prototype: undefined,
+        // Block console to prevent leaking - provide safe alternatives
+        console: {
+          log: (...args: unknown[]) => logs.push(args.map(a => String(a)).join(' ')),
+          warn: (...args: unknown[]) => logs.push('[warn] ' + args.map(a => String(a)).join(' ')),
+          error: (...args: unknown[]) => logs.push('[error] ' + args.map(a => String(a)).join(' ')),
+          info: (...args: unknown[]) => logs.push('[info] ' + args.map(a => String(a)).join(' ')),
+        },
       }
+
+      // Add provided environment variables to scope if any
+      if (options?.env) {
+        safeScope.env = { ...options.env }
+      }
+
+      // Build parameter names and values for the sandbox function
+      const scopeKeys = Object.keys(safeScope)
+      const scopeValues = scopeKeys.map(key => safeScope[key])
+
+      // Wrap code to execute in strict mode with explicit 'this' binding to undefined
+      // This prevents access to the global object via 'this'
+      const wrappedCode = `
+        "use strict";
+        return (function() {
+          "use strict";
+          ${code}
+        }).call(undefined);
+      `
+
+      // Create sandbox function with restricted scope
+      // eslint-disable-next-line @typescript-eslint/no-implied-eval
+      const sandboxFn = new Function(...scopeKeys, wrappedCode)
+
+      // Execute in sandbox with scope values
+      const result = sandboxFn.apply(undefined, scopeValues)
 
       return {
         success: true,
@@ -793,7 +882,7 @@ export class DO<Env = unknown, _State = unknown> {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown execution error',
-        logs: [],
+        logs,
         duration: Date.now() - startTime,
       }
     }
@@ -825,6 +914,7 @@ export class DO<Env = unknown, _State = unknown> {
 
   /**
    * Convert raw database row to Thing object
+   * Uses Zod validation for parsed data
    */
   private rowToThing<T extends Record<string, unknown>>(row: {
     ns: string
@@ -834,8 +924,11 @@ export class DO<Env = unknown, _State = unknown> {
     data: string
     created_at: string
     updated_at: string
-  }): Thing<T> {
-    const parsed = JSON.parse(row.data)
+  }): Thing<T> | null {
+    const parsed = safeJsonParse(row.data, ThingDataSchema)
+    if (parsed === null) {
+      return null
+    }
     return {
       ns: row.ns,
       type: row.type,
@@ -852,23 +945,14 @@ export class DO<Env = unknown, _State = unknown> {
    * Create a thing with ns/type/id addressing
    */
   async createThing<T extends Record<string, unknown>>(options: CreateOptions<T>): Promise<Thing<T>> {
-    validateCreateThingOptions(options)
-
     this.initSchema()
 
     const id = options.id ?? this.generateId()
     const url = options.url ?? this.generateThingUrl(options.ns, options.type, id)
     const now = new Date().toISOString()
 
-    // Add auth metadata to data if available
-    const auth = this.getAuthContext()
-    const authMetadata = {
-      ...(auth?.userId && { _createdBy: auth.userId }),
-      ...(auth?.organizationId && { _organization: auth.organizationId }),
-    }
-
     const dataToStore = {
-      data: { ...options.data, ...authMetadata },
+      data: options.data,
       '@context': options['@context'],
     }
 
@@ -888,7 +972,7 @@ export class DO<Env = unknown, _State = unknown> {
       type: options.type,
       id,
       url,
-      data: { ...options.data, ...authMetadata },
+      data: options.data,
       createdAt: new Date(now),
       updatedAt: new Date(now),
       '@context': options['@context'],
@@ -899,8 +983,6 @@ export class DO<Env = unknown, _State = unknown> {
    * Get thing by URL
    */
   async getThing<T extends Record<string, unknown>>(url: string): Promise<Thing<T> | null> {
-    validateUrl(url)
-
     this.initSchema()
 
     const results = this.ctx.storage.sql
@@ -930,10 +1012,6 @@ export class DO<Env = unknown, _State = unknown> {
     type: string,
     id: string
   ): Promise<Thing<T> | null> {
-    validateNamespace(ns)
-    validateType(type)
-    validateId(id)
-
     this.initSchema()
 
     const results = this.ctx.storage.sql
@@ -964,9 +1042,6 @@ export class DO<Env = unknown, _State = unknown> {
    * Upsert a thing by URL
    */
   async setThing<T extends Record<string, unknown>>(url: string, data: T): Promise<Thing<T>> {
-    validateUrl(url)
-    validateData(data)
-
     this.initSchema()
 
     // Check if thing exists
@@ -1024,8 +1099,6 @@ export class DO<Env = unknown, _State = unknown> {
    * Delete a thing by URL
    */
   async deleteThing(url: string): Promise<boolean> {
-    validateUrl(url)
-
     this.initSchema()
 
     // Check if thing exists
@@ -1055,17 +1128,41 @@ export class DO<Env = unknown, _State = unknown> {
       )
       .toArray()
 
-    return results.map((row) =>
-      this.rowToThing<T>(row as {
-        ns: string
-        type: string
-        id: string
-        url: string
-        data: string
-        created_at: string
-        updated_at: string
-      })
-    )
+    // Filter out invalid rows that fail Zod validation
+    return results
+      .map((row) =>
+        this.rowToThing<T>(row as {
+          ns: string
+          type: string
+          id: string
+          url: string
+          data: string
+          created_at: string
+          updated_at: string
+        })
+      )
+      .filter((thing): thing is Thing<T> => thing !== null)
+  }
+
+  /**
+   * Validate JSON field path to prevent SQL injection
+   * Only allows alphanumeric characters, dots, brackets, and underscores
+   */
+  private validateJsonFieldPath(path: string): void {
+    // Pattern: alphanumeric, underscores, dots (for nested access), and brackets with numbers (for array access)
+    // This prevents SQL injection characters like ; ' " ` ( ) -- etc.
+    const validPathPattern = /^[a-zA-Z0-9_.\[\]]+$/
+
+    if (!validPathPattern.test(path)) {
+      throw new Error(`Invalid JSON field path: "${path}". Paths may only contain alphanumeric characters, underscores, dots, and brackets.`)
+    }
+
+    // Additional checks for specific SQL injection patterns
+    if (path.includes('--') || path.includes(';') || path.includes("'") ||
+        path.includes('"') || path.includes('`') || path.includes('(') ||
+        path.includes(')')) {
+      throw new Error(`Invalid JSON field path: "${path}". Path contains potentially malicious characters.`)
+    }
   }
 
   /**
@@ -1096,6 +1193,10 @@ export class DO<Env = unknown, _State = unknown> {
       if (key.startsWith('data.')) {
         // Use JSON extraction for data fields
         const fieldPath = key.slice(5) // Remove 'data.' prefix
+
+        // Validate the field path to prevent SQL injection
+        this.validateJsonFieldPath(fieldPath)
+
         conditions.push(`json_extract(data, '$.data.${fieldPath}') = ?`)
         params.push(value)
       }
@@ -1206,18 +1307,6 @@ export class DO<Env = unknown, _State = unknown> {
   async track<T extends Record<string, unknown>>(
     options: CreateEventOptions<T>
   ): Promise<Event<T>> {
-    // Early validation for undefined options
-    if (!options) {
-      throw new ValidationError('options is required')
-    }
-
-    // Auto-populate source from auth context if not provided
-    const auth = this.getAuthContext()
-    const source = options.source ?? auth?.userId ?? 'unknown'
-
-    // Validate options with source populated
-    validateTrackOptions({ ...options, source })
-
     this.initSchema()
 
     const id = this.generateId()
@@ -1228,7 +1317,7 @@ export class DO<Env = unknown, _State = unknown> {
       id,
       options.type,
       timestamp.toISOString(),
-      source,
+      options.source,
       JSON.stringify(options.data),
       options.correlationId ?? null,
       options.causationId ?? null
@@ -1238,7 +1327,7 @@ export class DO<Env = unknown, _State = unknown> {
       id,
       type: options.type,
       timestamp,
-      source,
+      source: options.source,
       data: options.data,
       correlationId: options.correlationId,
       causationId: options.causationId,
@@ -1358,8 +1447,6 @@ export class DO<Env = unknown, _State = unknown> {
   async relate<T extends Record<string, unknown> = Record<string, unknown>>(
     options: RelateOptions<T>
   ): Promise<Relationship<T>> {
-    validateRelateOptions(options)
-
     this.initSchema()
 
     const { type, from, to, data } = options
@@ -1421,10 +1508,6 @@ export class DO<Env = unknown, _State = unknown> {
    * Remove a relationship between two things
    */
   async unrelate(from: string, type: string, to: string): Promise<boolean> {
-    validateUrl(from, 'from')
-    validateType(type)
-    validateUrl(to, 'to')
-
     this.initSchema()
 
     // Check if relationship exists
@@ -1660,18 +1743,6 @@ export class DO<Env = unknown, _State = unknown> {
   async send<T extends Record<string, unknown> = Record<string, unknown>>(
     options: CreateActionOptions<T>
   ): Promise<Action<T>> {
-    // Early validation for undefined options
-    if (!options) {
-      throw new ValidationError('options is required')
-    }
-
-    // Auto-populate actor from auth context if not provided
-    const auth = this.getAuthContext()
-    const actor = options.actor ?? auth?.userId ?? 'unknown'
-
-    // Validate options with actor populated
-    validateSendOptions({ ...options, actor })
-
     this.initSchema()
 
     const id = this.generateId()
@@ -1681,7 +1752,7 @@ export class DO<Env = unknown, _State = unknown> {
       `INSERT INTO actions (id, actor, object, action, status, metadata, created_at, updated_at)
        VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)`,
       id,
-      actor,
+      options.actor,
       options.object,
       options.action,
       options.metadata ? JSON.stringify(options.metadata) : null,
@@ -1691,7 +1762,7 @@ export class DO<Env = unknown, _State = unknown> {
 
     return {
       id,
-      actor,
+      actor: options.actor,
       object: options.object,
       action: options.action,
       status: 'pending',
@@ -2118,8 +2189,6 @@ export class DO<Env = unknown, _State = unknown> {
    * Store an artifact (cached content with optional TTL)
    */
   async storeArtifact<T>(options: StoreArtifactOptions<T>): Promise<Artifact<T>> {
-    validateStoreArtifactOptions(options)
-
     this.initSchema()
 
     const { key, type, source, sourceHash, content, ttl, metadata } = options
@@ -2160,8 +2229,6 @@ export class DO<Env = unknown, _State = unknown> {
    * Get an artifact by key
    */
   async getArtifact<T = unknown>(key: string): Promise<Artifact<T> | null> {
-    validateArtifactKey(key)
-
     this.initSchema()
 
     const results = this.ctx.storage.sql
@@ -2261,17 +2328,23 @@ export class DO<Env = unknown, _State = unknown> {
 
     const now = new Date().toISOString()
 
-    // Delete expired artifacts and get count of deleted rows
-    const deleteResults = this.ctx.storage.sql
+    // Get count of expired artifacts before deletion
+    const expiredResults = this.ctx.storage.sql
       .exec(
-        'DELETE FROM artifacts WHERE expires_at IS NOT NULL AND expires_at < ?',
+        'SELECT COUNT(*) as count FROM artifacts WHERE expires_at IS NOT NULL AND expires_at < ?',
         now
       )
       .toArray()
 
-    const deletedCount = (deleteResults[0] as { deleted: number })?.deleted ?? 0
+    const count = (expiredResults[0] as { count: number })?.count ?? 0
 
-    return deletedCount
+    // Delete expired artifacts
+    this.ctx.storage.sql.exec(
+      'DELETE FROM artifacts WHERE expires_at IS NOT NULL AND expires_at < ?',
+      now
+    )
+
+    return count
   }
 
   // ============================================
@@ -2555,926 +2628,159 @@ export class DO<Env = unknown, _State = unknown> {
   }
 
   // ============================================
-  // Auth Context Methods
-  // ============================================
-
-  /**
-   * Returns the auth context that was set via setAuthContext(), typically
-   * extracted from Authorization headers or WebSocket upgrade requests.
-   *
-   * This is used by methods to access the current user's authentication
-   * information during execution.
-   *
-   * @returns The current AuthContext or null if not authenticated
-   */
-  getAuthContext(): AuthContext | null {
-    return this._authContext ?? null
-  }
-
-  /**
-   * Set the auth context for the current request.
-   * This is typically called by transport handlers (HTTP, WebSocket, RPC)
-   * after extracting authentication information from the request.
-   *
-   * @param context - The auth context to set, or null to clear
-   */
-  setAuthContext(context: AuthContext | null): void {
-    this._authContext = context ?? undefined
-  }
-
-  /**
-   * Check if the current user has a specific permission
-   * @param permission - The permission to check
-   * @returns true if the user has the permission, false otherwise
-   */
-  checkPermission(permission: string): boolean {
-    const auth = this.getAuthContext()
-    if (!auth) {
-      return false
-    }
-    if (!auth.permissions || auth.permissions.length === 0) {
-      return false
-    }
-    return auth.permissions.includes(permission)
-  }
-
-  /**
-   * Require a specific permission, throwing an error if not present
-   * @param permission - The permission required
-   * @throws Error if the user doesn't have the permission
-   */
-  requirePermission(permission: string): void {
-    const auth = this.getAuthContext()
-    if (!auth) {
-      throw new Error('Authentication required')
-    }
-    if (!this.checkPermission(permission)) {
-      throw new Error('Permission denied')
-    }
-  }
-
-  /**
-   * Get a value from the auth context metadata
-   * @param key - The metadata key to retrieve
-   * @returns The value from metadata, or undefined if not found
-   */
-  getAuthMetadata<T = unknown>(key: string): T | undefined {
-    const auth = this.getAuthContext()
-    if (!auth || !auth.metadata) {
-      return undefined
-    }
-    return auth.metadata[key] as T | undefined
-  }
-
-  /**
-   * Get the current transport context
-   * Returns information about which transport this request came through
-   * @returns The current TransportContext or null if not set
-   */
-  getCurrentTransportContext(): import('./types').TransportContext | null {
-    return this._transportContext ?? null
-  }
-
-  /**
-   * Alias for getCurrentTransportContext
-   * @returns The current TransportContext or null if not set
-   */
-  getTransportContext(): import('./types').TransportContext | null {
-    return this._transportContext ?? null
-  }
-
-
-  /**
-   * Get the auth context for a specific WebSocket connection
-   * @param ws - The WebSocket to get auth for
-   * @returns The auth context or null if not found
-   */
-  getWebSocketAuth(ws: WebSocket): AuthContext | null {
-    const metadata = this.connections.get(ws)
-    return (metadata?.auth as AuthContext) ?? null
-  }
-
-  /**
-   * Set the auth context for a specific WebSocket connection
-   * @param ws - The WebSocket to set auth for
-   * @param auth - The auth context to set
-   */
-  setWebSocketAuth(ws: WebSocket, auth: AuthContext | null): void {
-    const metadata = this.connections.get(ws) ?? {}
-    if (auth) {
-      metadata.auth = auth
-      this.connections.set(ws, metadata)
-    } else {
-      delete metadata.auth
-      if (Object.keys(metadata).length === 0) {
-        this.connections.delete(ws)
-      } else {
-        this.connections.set(ws, metadata)
-      }
-    }
-  }
-
-  /**
-   * Get the WebSocket attachment (metadata) for a specific connection
-   * @param ws - The WebSocket to get attachment for
-   * @returns The attachment or null if not found
-   */
-  getWebSocketAttachment(ws: WebSocket): ConnectionMetadata | null {
-    return this.connections.get(ws) ?? null
-  }
-
-  /**
-   * Create a scoped proxy with a fixed auth context.
-   * All operations on the returned proxy will use the provided auth context,
-   * regardless of any context set on the original instance.
-   *
-   * @param authContext - The auth context to use for all operations
-   * @returns A proxy that uses the fixed auth context
-   */
-  withAuth(authContext: AuthContext): this {
-    const target = this
-    return new Proxy(this, {
-      get(obj, prop, receiver) {
-        const value = Reflect.get(obj, prop, receiver)
-
-        // For getAuthContext, return the fixed auth context
-        if (prop === 'getAuthContext') {
-          return () => authContext
-        }
-
-        // For functions, wrap them to set auth context
-        if (typeof value === 'function') {
-          return function (this: unknown, ...args: unknown[]) {
-            // Set auth context before calling
-            target._authContext = authContext
-            try {
-              const result = value.apply(obj, args)
-              // Handle async functions
-              if (result instanceof Promise) {
-                return result.finally(() => {
-                  // Don't clear here - let the proxy maintain the context
-                })
-              }
-              return result
-            } catch (error) {
-              throw error
-            }
-          }
-        }
-
-        return value
-      },
-    }) as this
-  }
-
-  // ============================================
-  // WebSocket Connection Management
-  // ============================================
-
-  /**
-   * Register a WebSocket connection with metadata
-   * @param ws - The WebSocket to register
-   * @param metadata - Connection metadata (userId, roomId, etc.)
-   */
-  async registerConnection(ws: WebSocket, metadata: ConnectionMetadata = {}): Promise<void> {
-    this.connections.set(ws, {
-      connectedAt: new Date(),
-      ...metadata,
-    })
-  }
-
-  /**
-   * Get metadata for a specific connection
-   * @param ws - The WebSocket to get metadata for
-   * @returns The connection metadata or undefined if not found
-   */
-  getConnectionMetadata(ws: WebSocket): ConnectionMetadata | undefined {
-    return this.connections.get(ws)
-  }
-
-  /**
-   * Update metadata for a connection
-   * @param ws - The WebSocket to update
-   * @param metadata - The metadata updates to apply
-   */
-  async updateConnectionMetadata(ws: WebSocket, metadata: Partial<ConnectionMetadata>): Promise<void> {
-    const existing = this.connections.get(ws)
-    if (existing) {
-      this.connections.set(ws, { ...existing, ...metadata })
-    }
-  }
-
-  /**
-   * Get all connections, optionally filtered
-   * @param filter - Optional filter function or object with properties to match
-   * @returns Array of [WebSocket, metadata] pairs
-   */
-  getConnections(filter?: ((metadata: ConnectionMetadata) => boolean) | Partial<ConnectionMetadata>): [WebSocket, ConnectionMetadata][] {
-    const entries = Array.from(this.connections.entries())
-    if (!filter) {
-      return entries
-    }
-
-    if (typeof filter === 'function') {
-      return entries.filter(([, metadata]) => filter(metadata))
-    }
-
-    // Object-based filter: match all properties
-    return entries.filter(([, metadata]) => {
-      for (const [key, value] of Object.entries(filter)) {
-        if (metadata[key] !== value) {
-          return false
-        }
-      }
-      return true
-    })
-  }
-
-  /**
-   * Broadcast a message to all connections, optionally filtered
-   * @param message - The message to send
-   * @param filter - Optional filter function or object to select connections
-   */
-  async broadcast(message: string | ArrayBuffer, filter?: ((metadata: ConnectionMetadata) => boolean) | Partial<ConnectionMetadata>): Promise<void> {
-    const connections = this.getConnections(filter)
-    for (const [ws] of connections) {
-      try {
-        ws.send(message)
-      } catch {
-        // Connection may have closed, will be cleaned up on next close event
-      }
-    }
-  }
-
-  /**
-   * Close and remove all connections
-   */
-  async destroyAllConnections(): Promise<void> {
-    for (const [ws] of this.connections) {
-      try {
-        ws.close()
-      } catch {
-        // Ignore close errors
-      }
-    }
-    this.connections.clear()
-  }
-
-  /**
-   * Find connections matching metadata criteria
-   * @param criteria - Object with properties to match
-   * @returns Array of WebSockets matching the criteria
-   */
-  findConnectionsByMetadata(criteria: Partial<ConnectionMetadata>): WebSocket[] {
-    return this.getConnections(criteria).map(([ws]) => ws)
-  }
-
-  /**
-   * Get the number of active connections
-   * @returns The number of tracked connections
-   */
-  getConnectionCount(): number {
-    return this.connections.size
-  }
-
-  /**
-   * Get all active WebSocket connections
-   * @returns Array of all tracked WebSockets
-   */
-  getActiveConnections(): WebSocket[] {
-    return Array.from(this.connections.keys())
-  }
-
-  // ============================================
-  // CDC Pipeline Operations
-  // ============================================
-
-  /**
-   * Create a CDC batch from events
-   */
-  async createCDCBatch(options: {
-    startTime?: Date
-    endTime?: Date
-    eventType?: string
-    maxEvents?: number
-  } = {}): Promise<{
-    id: string
-    eventCount: number
-    status: 'pending' | 'empty'
-    startTime?: Date
-    endTime?: Date
-  }> {
-    this.initSchema()
-
-    const { startTime, endTime, eventType, maxEvents } = options
-
-    // Build query to count and select events
-    const conditions: string[] = []
-    const params: unknown[] = []
-
-    if (eventType) {
-      conditions.push('type = ?')
-      params.push(eventType)
-    }
-
-    if (startTime) {
-      conditions.push('timestamp >= ?')
-      params.push(startTime.toISOString())
-    }
-
-    if (endTime) {
-      conditions.push('timestamp <= ?')
-      params.push(endTime.toISOString())
-    }
-
-    let query = 'SELECT COUNT(*) as count FROM events'
-    if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ')
-    }
-
-    const countResults = this.ctx.storage.sql.exec(query, ...params).toArray()
-    const eventCount = (countResults[0] as { count: number }).count
-
-    // Apply maxEvents limit if specified
-    const actualEventCount = maxEvents !== undefined ? Math.min(eventCount, maxEvents) : eventCount
-
-    const batchId = this.generateId()
-    const now = new Date().toISOString()
-    const status = actualEventCount === 0 ? 'empty' : 'pending'
-
-    this.ctx.storage.sql.exec(
-      `INSERT INTO cdc_batches (id, status, event_count, start_time, end_time, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      batchId,
-      status,
-      actualEventCount,
-      startTime ? startTime.toISOString() : null,
-      endTime ? endTime.toISOString() : null,
-      now
-    )
-
-    return {
-      id: batchId,
-      eventCount: actualEventCount,
-      status,
-      startTime,
-      endTime,
-    }
-  }
-
-  /**
-   * Get a CDC batch by ID
-   */
-  async getCDCBatch(id: string): Promise<{
-    id: string
-    eventCount: number
-    status: string
-    startTime?: Date
-    endTime?: Date
-    createdAt: Date
-    transformedAt?: Date
-    completedAt?: Date
-    parquetSize?: number
-    r2Key?: string
-  } | null> {
-    this.initSchema()
-
-    const results = this.ctx.storage.sql
-      .exec('SELECT * FROM cdc_batches WHERE id = ?', id)
-      .toArray()
-
-    if (results.length === 0) {
-      return null
-    }
-
-    const row = results[0] as {
-      id: string
-      status: string
-      event_count: number
-      start_time: string | null
-      end_time: string | null
-      created_at: string
-      transformed_at: string | null
-      completed_at: string | null
-      parquet_size: number | null
-      r2_key: string | null
-    }
-
-    return {
-      id: row.id,
-      eventCount: row.event_count,
-      status: row.status,
-      startTime: row.start_time ? new Date(row.start_time) : undefined,
-      endTime: row.end_time ? new Date(row.end_time) : undefined,
-      createdAt: new Date(row.created_at),
-      transformedAt: row.transformed_at ? new Date(row.transformed_at) : undefined,
-      completedAt: row.completed_at ? new Date(row.completed_at) : undefined,
-      parquetSize: row.parquet_size ?? undefined,
-      r2Key: row.r2_key ?? undefined,
-    }
-  }
-
-  /**
-   * Query CDC batches by status
-   */
-  async queryCDCBatches(options: { status?: string } = {}): Promise<Array<{
-    id: string
-    eventCount: number
-    status: string
-  }>> {
-    this.initSchema()
-
-    let query = 'SELECT id, event_count, status FROM cdc_batches'
-    const params: unknown[] = []
-
-    if (options.status) {
-      query += ' WHERE status = ?'
-      params.push(options.status)
-    }
-
-    query += ' ORDER BY created_at DESC'
-
-    const results = this.ctx.storage.sql.exec(query, ...params).toArray()
-
-    return results.map((row) => {
-      const r = row as { id: string; event_count: number; status: string }
-      return {
-        id: r.id,
-        eventCount: r.event_count,
-        status: r.status,
-      }
-    })
-  }
-
-  /**
-   * Transform a batch to Parquet format
-   */
-  async transformToParquet(
-    batchId: string,
-    options: {
-      compression?: 'UNCOMPRESSED' | 'SNAPPY' | 'GZIP'
-      rowGroupSize?: number
-      includeSchema?: boolean
-      includeStats?: boolean
-    } = {}
-  ): Promise<ArrayBuffer | {
-    parquetData: ArrayBuffer
-    schema: { fields: Array<{ name: string; type: string }> }
-    stats?: {
-      rowCount: number
-      columnCount: number
-      uncompressedSize: number
-      compressedSize: number
-      compressionRatio: number
-      transformDurationMs: number
-    }
-  }> {
-    this.initSchema()
-
-    const startTime = Date.now()
-
-    // Get the batch
-    const batch = await this.getCDCBatch(batchId)
-    if (!batch) {
-      throw new Error('Batch not found')
-    }
-
-    if (batch.status === 'empty') {
-      throw new Error('Cannot transform empty batch')
-    }
-
-    // Don't allow re-transformation after the first successful transform
-    if (batch.status === 'transformed' || batch.status === 'completed') {
-      throw new Error('Batch already transformed')
-    }
-
-    // Fetch events for this batch
-    const conditions: string[] = []
-    const params: unknown[] = []
-
-    if (batch.startTime) {
-      conditions.push('timestamp >= ?')
-      params.push(batch.startTime.toISOString())
-    }
-
-    if (batch.endTime) {
-      conditions.push('timestamp <= ?')
-      params.push(batch.endTime.toISOString())
-    }
-
-    let query = 'SELECT * FROM events'
-    if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ')
-    }
-    query += ' ORDER BY timestamp ASC'
-
-    const results = this.ctx.storage.sql.exec(query, ...params).toArray()
-
-    const events = results.map((row) => {
-      const r = row as {
-        id: string
-        type: string
-        timestamp: string
-        source: string
-        data: string
-        correlation_id: string | null
-        causation_id: string | null
-      }
-      return {
-        id: r.id,
-        type: r.type,
-        timestamp: r.timestamp,
-        source: r.source,
-        data: JSON.parse(r.data),
-        correlationId: r.correlation_id,
-        causationId: r.causation_id,
-      }
-    })
-
-    // Create Parquet data using minimal encoder
-    const { ParquetEncoder } = await import('./cdc-pipeline')
-    const parquetData = ParquetEncoder.encode(events, options)
-
-    // Update batch status only if not already transformed
-    if (batch.status === 'pending') {
-      const now = new Date().toISOString()
-      this.ctx.storage.sql.exec(
-        'UPDATE cdc_batches SET status = ?, transformed_at = ?, parquet_size = ? WHERE id = ?',
-        'transformed',
-        now,
-        parquetData.byteLength,
-        batchId
-      )
-    }
-
-    // Return with schema and stats if requested
-    if (options.includeSchema || options.includeStats) {
-      const schema = this.inferParquetSchema(events[0])
-      const result: {
-        parquetData: ArrayBuffer
-        schema: { fields: Array<{ name: string; type: string }> }
-        stats?: {
-          rowCount: number
-          columnCount: number
-          uncompressedSize: number
-          compressedSize: number
-          compressionRatio: number
-          transformDurationMs: number
-        }
-      } = {
-        parquetData,
-        schema: { fields: schema },
-      }
-
-      if (options.includeStats) {
-        result.stats = ParquetEncoder.calculateStats(parquetData, events, schema, startTime)
-      }
-
-      return result
-    }
-
-    return parquetData
-  }
-
-  /**
-   * Infer Parquet schema from an event
-   */
-  private inferParquetSchema(event: Record<string, unknown>): Array<{ name: string; type: string }> {
-    const schema: Array<{ name: string; type: string }> = []
-
-    schema.push({ name: 'id', type: 'STRING' })
-    schema.push({ name: 'type', type: 'STRING' })
-    schema.push({ name: 'timestamp', type: 'STRING' })
-    schema.push({ name: 'source', type: 'STRING' })
-
-    if (event.data && typeof event.data === 'object') {
-      this.inferDataSchema(event.data as Record<string, unknown>, 'data', schema)
-    }
-
-    return schema
-  }
-
-  /**
-   * Recursively infer schema from data object
-   */
-  private inferDataSchema(
-    obj: Record<string, unknown>,
-    prefix: string,
-    schema: Array<{ name: string; type: string }>
-  ): void {
-    for (const [key, value] of Object.entries(obj)) {
-      const fieldName = `${prefix}.${key}`
-      const fieldType = this.inferParquetType(value)
-
-      if (fieldType !== 'OBJECT' && fieldType !== 'ARRAY') {
-        schema.push({ name: fieldName, type: fieldType })
-      } else if (fieldType === 'OBJECT' && value && typeof value === 'object' && !Array.isArray(value)) {
-        this.inferDataSchema(value as Record<string, unknown>, fieldName, schema)
-      }
-    }
-  }
-
-  /**
-   * Infer Parquet type from value
-   */
-  private inferParquetType(value: unknown): string {
-    if (value === null || value === undefined) return 'STRING'
-    if (typeof value === 'boolean') return 'BOOLEAN'
-    if (typeof value === 'number') {
-      return Number.isInteger(value) ? 'INT64' : 'DOUBLE'
-    }
-    if (typeof value === 'string') return 'STRING'
-    if (Array.isArray(value)) return 'ARRAY'
-    if (typeof value === 'object') return 'OBJECT'
-    return 'STRING'
-  }
-
-  /**
-   * Output Parquet data to R2
-   */
-  async outputToR2(batchId: string): Promise<{
-    key: string
-    bucket: string
-    size: number
-  }> {
-    this.initSchema()
-
-    const batch = await this.getCDCBatch(batchId)
-    if (!batch) {
-      throw new Error('Batch not found')
-    }
-
-    if (batch.status !== 'transformed') {
-      throw new Error('Batch must be transformed before output')
-    }
-
-    // Re-fetch the Parquet data - need to get it from a stored location or regenerate
-    // For now, we'll store a reference and regenerate on demand
-    const conditions: string[] = []
-    const params: unknown[] = []
-
-    if (batch.startTime) {
-      conditions.push('timestamp >= ?')
-      params.push(batch.startTime.toISOString())
-    }
-
-    if (batch.endTime) {
-      conditions.push('timestamp <= ?')
-      params.push(batch.endTime.toISOString())
-    }
-
-    let query = 'SELECT * FROM events'
-    if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ')
-    }
-    query += ' ORDER BY timestamp ASC'
-
-    const results = this.ctx.storage.sql.exec(query, ...params).toArray()
-
-    const events = results.map((row) => {
-      const r = row as {
-        id: string
-        type: string
-        timestamp: string
-        source: string
-        data: string
-        correlation_id: string | null
-        causation_id: string | null
-      }
-      return {
-        id: r.id,
-        type: r.type,
-        timestamp: r.timestamp,
-        source: r.source,
-        data: JSON.parse(r.data),
-        correlationId: r.correlation_id,
-        causationId: r.causation_id,
-      }
-    })
-
-    const { ParquetEncoder } = await import('./cdc-pipeline')
-    const parquetBuffer = ParquetEncoder.encode(events, {})
-
-    // Generate partitioned R2 key
-    const now = new Date()
-    const year = now.getFullYear()
-    const month = String(now.getMonth() + 1).padStart(2, '0')
-    const day = String(now.getDate()).padStart(2, '0')
-    const key = `year=${year}/month=${month}/day=${day}/${batchId}.parquet`
-
-    // Upload to R2
-    const env = this.env as { CDC_BUCKET?: { put: (key: string, data: ArrayBuffer) => Promise<void> } }
-    if (env.CDC_BUCKET) {
-      await env.CDC_BUCKET.put(key, parquetBuffer)
-    }
-
-    // Update batch status
-    const completedAt = new Date().toISOString()
-    this.ctx.storage.sql.exec(
-      'UPDATE cdc_batches SET status = ?, completed_at = ?, r2_key = ? WHERE id = ?',
-      'completed',
-      completedAt,
-      key,
-      batchId
-    )
-
-    return {
-      key,
-      bucket: 'CDC_BUCKET',
-      size: parquetBuffer.byteLength,
-    }
-  }
-
-  /**
-   * Process full CDC pipeline: batch -> transform -> output
-   */
-  async processCDCPipeline(options: {
-    startTime?: Date
-    endTime?: Date
-    eventType?: string
-    maxEvents?: number
-  } = {}): Promise<{
-    batchId: string
-    eventCount: number
-    status: string
-    r2Key?: string
-  }> {
-    this.initSchema()
-
-    // Create batch
-    const batch = await this.createCDCBatch(options)
-
-    if (batch.status === 'empty') {
-      return {
-        batchId: batch.id,
-        eventCount: 0,
-        status: 'skipped',
-      }
-    }
-
-    // Transform to Parquet
-    await this.transformToParquet(batch.id)
-
-    // Output to R2
-    const r2Result = await this.outputToR2(batch.id)
-
-    return {
-      batchId: batch.id,
-      eventCount: batch.eventCount,
-      status: 'completed',
-      r2Key: r2Result.key,
-    }
-  }
-
-
-  // ============================================
   // WebSocket Hibernation
   // ============================================
 
   /**
-   * Subscribe to an event
-   * @param event - Event name to subscribe to
-   * @param handler - Handler function
-   */
-  on(event: string, handler: (data: unknown) => void): void {
-    const handlers = this.eventHandlers.get(event) || []
-    handlers.push(handler)
-    this.eventHandlers.set(event, handlers)
-  }
-
-  /**
-   * Unsubscribe from an event
-   * @param event - Event name to unsubscribe from
-   * @param handler - Handler function to remove
-   */
-  off(event: string, handler: (data: unknown) => void): void {
-    const handlers = this.eventHandlers.get(event) || []
-    const index = handlers.indexOf(handler)
-    if (index !== -1) {
-      handlers.splice(index, 1)
-      this.eventHandlers.set(event, handlers)
-    }
-  }
-
-  /**
-   * Emit an event to all subscribers
-   * @param event - Event name to emit
-   * @param data - Event data
-   */
-  private emit(event: string, data: unknown): void {
-    const handlers = this.eventHandlers.get(event) || []
-    for (const handler of handlers) {
-      try {
-        handler(data)
-      } catch {
-        // Ignore handler errors
-      }
-    }
-  }
-
-  /**
    * Handle incoming WebSocket message
+   * Parses JSON-RPC 2.0 format messages and routes to appropriate method handlers
    */
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
-    // Handle text messages as JSON RPC
-    if (typeof message === 'string') {
-      try {
-        const data = JSON.parse(message) as Record<string, unknown>
-
-        // Extract auth from message if present
-        const messageAuth = data.auth as AuthContext | undefined
-
-        // Get connection-level auth (stored during WebSocket upgrade)
-        const connectionAuth = this.connections.get(ws)?.auth as AuthContext | undefined
-
-        // Use message auth if present, otherwise use connection auth
-        const authContext = messageAuth ?? connectionAuth ?? null
-
-        // Save current contexts to restore after (for isolation)
-        const previousAuth = this._authContext
-        const previousTransport = this._transportContext
-
-        try {
-          // Set auth for this message
-          if (authContext) {
-            this._authContext = authContext
-          }
-
-          // Set transport context for WebSocket
-          this._transportContext = {
-            type: 'websocket',
-            ws,
-          }
-
-          // Check if this is an auth message
-          if (data.type === 'auth') {
-            // Update stored auth for this WebSocket
-            const newAuth: AuthContext = {}
-            if (data.token) newAuth.token = data.token as string
-            if (data.userId) newAuth.userId = data.userId as string
-            if (data.organizationId) newAuth.organizationId = data.organizationId as string
-            if (data.permissions) newAuth.permissions = data.permissions as string[]
-            if (data.metadata) newAuth.metadata = data.metadata as Record<string, unknown>
-            this.setWebSocketAuth(ws, newAuth)
-            ws.send(JSON.stringify({ type: 'auth', status: 'ok' }))
-            return
-          }
-
-          // Check if this is an RPC call
-          if (data.method && typeof data.method === 'string') {
-            const method = data.method as string
-            const params = (data.params as unknown[]) ?? []
-
-            try {
-              const result = await this.invoke(method, params)
-              ws.send(JSON.stringify({ result }))
-            } catch (error) {
-              ws.send(JSON.stringify({
-                error: error instanceof Error ? error.message : 'Unknown error'
-              }))
-            }
-          }
-        } finally {
-          // Restore previous contexts
-          this._authContext = previousAuth
-          this._transportContext = previousTransport
-        }
-      } catch {
-        // Not valid JSON or error processing - ignore or send error
-        ws.send(JSON.stringify({ error: 'Invalid message format' }))
-      }
+    // Convert ArrayBuffer to string if needed
+    let messageStr: string
+    if (message instanceof ArrayBuffer) {
+      const decoder = new TextDecoder()
+      messageStr = decoder.decode(message)
+    } else {
+      messageStr = message
     }
 
-    // Subclasses can override for custom handling
+    // Helper to send JSON-RPC response
+    const sendResponse = (response: {
+      jsonrpc: '2.0'
+      id?: string | number | null
+      result?: unknown
+      error?: { code: number; message: string; data?: unknown }
+    }) => {
+      ws.send(JSON.stringify(response))
+    }
+
+    // Helper to send JSON-RPC error response
+    const sendError = (
+      id: string | number | null | undefined,
+      code: number,
+      errorMessage: string,
+      data?: unknown
+    ) => {
+      sendResponse({
+        jsonrpc: '2.0',
+        id: id ?? null,
+        error: { code, message: errorMessage, data },
+      })
+    }
+
+    // Parse the message as JSON
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(messageStr)
+    } catch {
+      // Parse error - can't determine id
+      sendError(null, -32700, 'Parse error: Invalid JSON')
+      return
+    }
+
+    // Validate JSON-RPC structure
+    const request = parsed as {
+      jsonrpc?: string
+      id?: string | number | null
+      method?: string
+      params?: unknown[]
+    }
+
+    // Check for required method field
+    if (typeof request.method !== 'string') {
+      sendError(request.id, -32600, 'Invalid Request: Missing method field')
+      return
+    }
+
+    // Check if this is a notification (no id means no response expected)
+    const isNotification = request.id === undefined
+
+    // Check if method is allowed
+    if (!this.allowedMethods.has(request.method)) {
+      if (!isNotification) {
+        sendError(request.id, -32601, `Method not found: ${request.method}`)
+      }
+      return
+    }
+
+    // Get params (default to empty array)
+    const params = Array.isArray(request.params) ? request.params : []
+
+    // Execute the method
+    try {
+      const result = await this.invoke(request.method, params)
+
+      // Only send response if this is not a notification
+      if (!isNotification) {
+        sendResponse({
+          jsonrpc: '2.0',
+          id: request.id,
+          result,
+        })
+      }
+    } catch (error) {
+      // Only send error response if this is not a notification
+      if (!isNotification) {
+        const errMessage = error instanceof Error ? error.message : 'Unknown error'
+        sendError(request.id, -32000, errMessage)
+      }
+    }
   }
 
   /**
-   * Handle WebSocket close - cleans up connection state
-   * @param ws - The WebSocket that closed
-   * @param code - The close code
-   * @param reason - The close reason
-   * @param wasClean - Whether the close was clean
+   * Handle WebSocket close
+   * Cleans up connection state and notifies subscribers
    */
   async webSocketClose(
     ws: WebSocket,
-    code: number,
-    reason: string,
-    wasClean: boolean
+    _code: number,
+    _reason: string,
+    _wasClean: boolean
   ): Promise<void> {
-    // Get metadata before deleting
-    const metadata = this.connections.get(ws)
+    // Get connection info before removing
+    const connectionInfo = this.connections.get(ws)
 
-    // Emit connection:close event with metadata
-    this.emit('connection:close', {
-      ws,
-      code,
-      reason,
-      wasClean,
-      metadata,
-    })
+    if (!connectionInfo) {
+      // Connection was not tracked, nothing to clean up
+      return
+    }
 
-    // Clean up connection tracking
+    const connectionId = connectionInfo.id
+    const subscriptions = connectionInfo.subscriptions
+
+    // Remove connection from tracking map
     this.connections.delete(ws)
+
+    // Clean up subscriptions and notify other subscribers
+    for (const topic of subscriptions) {
+      const topicSubscribers = this.subscribers.get(topic)
+
+      if (topicSubscribers) {
+        // Remove this connection from the topic
+        topicSubscribers.delete(ws)
+
+        // Notify remaining subscribers about the disconnect
+        const disconnectNotification = JSON.stringify({
+          type: 'disconnect',
+          connectionId,
+          topic,
+        })
+
+        for (const subscriber of topicSubscribers) {
+          try {
+            subscriber.send(disconnectNotification)
+          } catch {
+            // Subscriber may already be closed, ignore errors
+          }
+        }
+
+        // Clean up empty subscriber sets
+        if (topicSubscribers.size === 0) {
+          this.subscribers.delete(topic)
+        }
+      }
+    }
   }
 
   /**
@@ -3489,155 +2795,10 @@ export class DO<Env = unknown, _State = unknown> {
   // ============================================
 
   /**
-   * Parse JWT token and extract claims (without verification)
-   * In production, you should verify the signature with a secret key
-   * @param token - The JWT token to parse
-   * @returns The parsed claims or null if invalid
-   */
-  private parseJWT(token: string): Record<string, unknown> | null {
-    try {
-      const parts = token.split('.')
-      if (parts.length !== 3) {
-        return null
-      }
-
-      // Decode base64url payload (second part)
-      const payload = parts[1]
-      // Replace base64url characters with base64
-      const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
-      // Pad if necessary
-      const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=')
-
-      const decoded = atob(padded)
-      return JSON.parse(decoded) as Record<string, unknown>
-    } catch {
-      return null
-    }
-  }
-
-  /**
-   * Extract auth context from request headers
-   * @param request - The incoming request
-   * @returns AuthContext or null if not authenticated
-   */
-  private extractAuthFromHeaders(request: Request): AuthContext | null {
-    // Prefer X-Auth-Context header for full context (highest priority)
-    const authContextHeader = request.headers.get('X-Auth-Context')
-    if (authContextHeader) {
-      try {
-        const parsed = JSON.parse(authContextHeader) as AuthContext
-        return parsed
-      } catch {
-        // Ignore parse errors and fall through to other methods
-      }
-    }
-
-    const auth: AuthContext = {}
-    let hasAuth = false
-
-    // Extract Authorization header
-    const authHeader = request.headers.get('Authorization')
-    if (authHeader) {
-      if (authHeader.startsWith('Bearer ')) {
-        const token = authHeader.slice(7)
-        auth.token = token
-        hasAuth = true
-
-        // Try to parse JWT claims
-        const claims = this.parseJWT(token)
-        if (claims) {
-          // Extract standard JWT fields
-          if (claims.userId) {
-            auth.userId = String(claims.userId)
-          }
-          if (claims.sub && !auth.userId) {
-            auth.userId = String(claims.sub)
-          }
-          if (claims.permissions && Array.isArray(claims.permissions)) {
-            auth.permissions = claims.permissions as string[]
-          }
-          if (claims.organizationId) {
-            auth.organizationId = String(claims.organizationId)
-          }
-          if (claims.org && !auth.organizationId) {
-            auth.organizationId = String(claims.org)
-          }
-          // Store other claims in metadata
-          const metadata: Record<string, unknown> = {}
-          for (const [key, value] of Object.entries(claims)) {
-            if (!['userId', 'sub', 'permissions', 'organizationId', 'org', 'iat', 'exp', 'nbf', 'iss', 'aud'].includes(key)) {
-              metadata[key] = value
-            }
-          }
-          if (Object.keys(metadata).length > 0) {
-            auth.metadata = metadata
-          }
-        }
-      } else if (authHeader.startsWith('Basic ')) {
-        // Parse Basic auth
-        const credentials = authHeader.slice(6)
-        try {
-          const decoded = atob(credentials)
-          const colonIndex = decoded.indexOf(':')
-          if (colonIndex > 0) {
-            const userId = decoded.slice(0, colonIndex)
-            auth.userId = userId
-            auth.token = credentials
-            hasAuth = true
-          }
-        } catch {
-          // Ignore parse errors
-        }
-      }
-    }
-
-    // Extract X-API-Key header
-    const apiKey = request.headers.get('X-API-Key')
-    if (apiKey) {
-      auth.token = apiKey
-      hasAuth = true
-    }
-
-    // Extract user ID from custom header (lower priority)
-    const userId = request.headers.get('X-User-ID')
-    if (userId && !auth.userId) {
-      auth.userId = userId
-      hasAuth = true
-    }
-
-    // Extract organization ID from custom header (lower priority)
-    const orgId = request.headers.get('X-Organization-ID')
-    if (orgId && !auth.organizationId) {
-      auth.organizationId = orgId
-      hasAuth = true
-    }
-
-    return hasAuth ? auth : null
-  }
-
-  /**
    * Create Hono router with all routes
    */
   private createRouter(): Hono {
     const app = new Hono()
-    const doInstance = this
-
-    // Auth extraction middleware - sets auth context for all requests
-    app.use('*', async (c, next) => {
-      const authContext = doInstance.extractAuthFromHeaders(c.req.raw)
-      if (authContext) {
-        doInstance.setAuthContext(authContext)
-      }
-      // Set transport context for HTTP requests
-      doInstance._transportContext = {
-        type: 'http',
-        request: c.req.raw,
-      }
-      await next()
-      // Clear contexts after request completes
-      doInstance.setAuthContext(null)
-      doInstance._transportContext = undefined
-    })
 
     // Health check
     app.get('/health', (c) => c.json({ status: 'ok' }))
@@ -3667,33 +2828,17 @@ export class DO<Env = unknown, _State = unknown> {
       })
     })
 
-    // RPC handler - supports both single and batch requests
+    // RPC handler
     app.post('/rpc', async (c) => {
       try {
-        const body = await c.req.json()
-
-        // Check if it's a batch request (array)
-        const isBatch = Array.isArray(body)
-        const requests = isBatch ? body : [body]
-
-        // Process all requests
-        const results = await Promise.all(
-          requests.map(async (req: any) => {
-            const { id, method, params, auth } = req
-
-            try {
-              // Use per-request auth if provided, otherwise use context auth
-              const authContext = auth ? (auth as AuthContext) : doInstance.getAuthContext()
-              const result = await this.invoke(method, params ?? [], authContext ?? undefined)
-              return { id, result }
-            } catch (err) {
-              return { id, error: err instanceof Error ? err.message : 'Unknown error' }
-            }
-          })
-        )
-
-        // Return batch or single result
-        return c.json(isBatch ? results : results[0])
+        const body = await c.req.json() as { id: string; method: string; params: unknown[] }
+        const { id, method, params } = body
+        try {
+          const result = await this.invoke(method, params)
+          return c.json({ id, result })
+        } catch (err) {
+          return c.json({ id, error: err instanceof Error ? err.message : 'Unknown error' })
+        }
       } catch {
         return c.json({ id: '', error: 'Invalid JSON' }, 400)
       }
@@ -3755,6 +2900,7 @@ export class DO<Env = unknown, _State = unknown> {
     app.get('/api/:resource', async (c) => {
       const resource = c.req.param('resource')
       const url = new URL(c.req.url)
+      const origin = url.origin
       const limit = url.searchParams.get('limit')
       const offset = url.searchParams.get('offset')
       const orderBy = url.searchParams.get('orderBy')
@@ -3767,11 +2913,12 @@ export class DO<Env = unknown, _State = unknown> {
       if (order) options.order = order
 
       const docs = await this.list(resource, options)
-      const origin = new URL(c.req.url).origin
+      // Return HATEOAS response with data and links
       return c.json({
         data: docs,
         links: {
           self: `${origin}/api/${resource}`,
+          collection: `${origin}/api/${resource}`,
         },
       })
     })
@@ -3779,9 +2926,10 @@ export class DO<Env = unknown, _State = unknown> {
     // POST /api/:resource - create document
     app.post('/api/:resource', async (c) => {
       const resource = c.req.param('resource')
+      const origin = new URL(c.req.url).origin
       const body = await c.req.json()
       const doc = await this.create(resource, body)
-      const origin = new URL(c.req.url).origin
+      // Return HATEOAS response with data and links
       return c.json({
         data: doc,
         links: {
@@ -3801,11 +2949,12 @@ export class DO<Env = unknown, _State = unknown> {
     app.get('/api/:resource/:id', async (c) => {
       const resource = c.req.param('resource')
       const id = c.req.param('id')
+      const origin = new URL(c.req.url).origin
       const doc = await this.get(resource, id)
       if (!doc) {
         return c.json({ error: 'Not found' }, 404)
       }
-      const origin = new URL(c.req.url).origin
+      // Return HATEOAS response with data and links
       return c.json({
         data: doc,
         links: {
@@ -3820,12 +2969,13 @@ export class DO<Env = unknown, _State = unknown> {
     app.put('/api/:resource/:id', async (c) => {
       const resource = c.req.param('resource')
       const id = c.req.param('id')
+      const origin = new URL(c.req.url).origin
       const body = await c.req.json()
       const doc = await this.update(resource, id, body)
       if (!doc) {
         return c.json({ error: 'Not found' }, 404)
       }
-      const origin = new URL(c.req.url).origin
+      // Return HATEOAS response with data and links
       return c.json({
         data: doc,
         links: {
@@ -3924,46 +3074,9 @@ function save() {
     // Handle WebSocket upgrades first (works on any path)
     const upgradeHeader = request.headers.get('Upgrade')
     if (upgradeHeader?.toLowerCase() === 'websocket') {
-      // Create WebSocket pair (check if WebSocketPair is available for test compatibility)
-      if (typeof WebSocketPair === 'undefined') {
-        return new Response('WebSocket not supported in this environment', { status: 501 })
-      }
+      // Create WebSocket pair
       const pair = new WebSocketPair()
       const [client, server] = Object.values(pair)
-
-      // Extract auth from upgrade request headers
-      let authContext = this.extractAuthFromHeaders(request)
-
-      // Also check query parameters for auth (common for browser WebSocket clients)
-      if (!authContext) {
-        const url = new URL(request.url)
-        const tokenFromQuery = url.searchParams.get('token')
-
-        if (tokenFromQuery) {
-          authContext = { token: tokenFromQuery }
-          // Try to parse as JWT
-          const claims = this.parseJWT(tokenFromQuery)
-          if (claims) {
-            if (claims.userId) {
-              authContext.userId = String(claims.userId)
-            }
-            if (claims.sub && !authContext.userId) {
-              authContext.userId = String(claims.sub)
-            }
-            if (claims.permissions && Array.isArray(claims.permissions)) {
-              authContext.permissions = claims.permissions as string[]
-            }
-            if (claims.organizationId) {
-              authContext.organizationId = String(claims.organizationId)
-            }
-          }
-        }
-      }
-
-      // Store auth for this WebSocket connection
-      if (authContext) {
-        this.connections.set(server, { auth: authContext })
-      }
 
       // Accept the WebSocket connection
       if (this.ctx.acceptWebSocket) {
@@ -3977,7 +3090,9 @@ function save() {
       })
     }
 
-    // Route HTTP requests through Hono (router is eagerly initialized in constructor)
-    return this._router!.fetch(request)
+    // Route HTTP requests through Hono
+    const router = this.createRouter()
+    return router.fetch(request)
   }
+
 }
