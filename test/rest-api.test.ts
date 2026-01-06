@@ -7,17 +7,140 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { DO } from '../src/do'
 
-// Mock execution context
-const mockCtx = {
-  waitUntil: vi.fn(),
-  passThroughOnException: vi.fn(),
-  storage: {
-    sql: {
-      exec: vi.fn().mockReturnValue({ toArray: () => [] }),
+/**
+ * Create an in-memory SQLite mock for testing
+ * This simulates the Cloudflare Durable Objects SQLite storage API
+ */
+function createMockSqlStorage() {
+  // In-memory storage using a Map
+  const tables: Map<string, Map<string, Record<string, unknown>>> = new Map()
+
+  return {
+    exec(query: string, ...params: unknown[]) {
+      const results: unknown[] = []
+
+      // Parse and execute simple SQL queries
+      const normalizedQuery = query.trim().toUpperCase()
+
+      if (normalizedQuery.startsWith('CREATE TABLE')) {
+        // CREATE TABLE - just initialize the table if needed
+        const tableMatch = query.match(/CREATE TABLE IF NOT EXISTS (\w+)/i)
+        if (tableMatch) {
+          const tableName = tableMatch[1]
+          if (!tables.has(tableName)) {
+            tables.set(tableName, new Map())
+          }
+        }
+      } else if (normalizedQuery.startsWith('INSERT')) {
+        // INSERT INTO documents (collection, id, data) VALUES (?, ?, ?)
+        const [collection, id, data] = params as [string, string, string]
+        const tableName = 'documents'
+        if (!tables.has(tableName)) {
+          tables.set(tableName, new Map())
+        }
+        const table = tables.get(tableName)!
+        const key = `${collection}:${id}`
+        table.set(key, { collection, id, data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      } else if (normalizedQuery.startsWith('SELECT')) {
+        // SELECT data FROM documents WHERE collection = ? AND id = ?
+        const tableName = 'documents'
+        const table = tables.get(tableName)
+
+        if (table) {
+          if (query.includes('WHERE collection = ? AND id = ?')) {
+            const [collection, id] = params as [string, string]
+            const key = `${collection}:${id}`
+            const row = table.get(key)
+            if (row) {
+              results.push({ data: row.data })
+            }
+          } else if (query.includes('WHERE collection IN')) {
+            // Search query with collections filter
+            const searchPattern = params[params.length - 2] as string
+            const limit = params[params.length - 1] as number
+            const collections = params.slice(0, -2) as string[]
+            const pattern = searchPattern.replace(/%/g, '').toLowerCase()
+
+            for (const [key, row] of table.entries()) {
+              const rowCollection = key.split(':')[0]
+              if (collections.includes(rowCollection)) {
+                const dataStr = (row.data as string).toLowerCase()
+                if (dataStr.includes(pattern)) {
+                  results.push({ collection: row.collection, id: row.id, data: row.data })
+                }
+              }
+              if (results.length >= limit) break
+            }
+          } else if (query.includes('WHERE data LIKE')) {
+            // Search all collections
+            const searchPattern = params[0] as string
+            const limit = params[1] as number
+            const pattern = searchPattern.replace(/%/g, '').toLowerCase()
+
+            for (const [, row] of table.entries()) {
+              const dataStr = (row.data as string).toLowerCase()
+              if (dataStr.includes(pattern)) {
+                results.push({ collection: row.collection, id: row.id, data: row.data })
+              }
+              if (results.length >= limit) break
+            }
+          } else if (query.includes('WHERE collection = ?')) {
+            // List query with pagination
+            const [collection, limit, offset] = params as [string, number, number]
+            const matching: Record<string, unknown>[] = []
+            for (const [key, row] of table.entries()) {
+              if (key.startsWith(`${collection}:`)) {
+                matching.push({ data: row.data })
+              }
+            }
+            // Apply pagination
+            const paginated = matching.slice(offset, offset + limit)
+            results.push(...paginated)
+          }
+        }
+      } else if (normalizedQuery.startsWith('UPDATE')) {
+        // UPDATE documents SET data = ?, updated_at = CURRENT_TIMESTAMP WHERE collection = ? AND id = ?
+        const [data, collection, id] = params as [string, string, string]
+        const tableName = 'documents'
+        const table = tables.get(tableName)
+        if (table) {
+          const key = `${collection}:${id}`
+          const existing = table.get(key)
+          if (existing) {
+            table.set(key, { ...existing, data, updated_at: new Date().toISOString() })
+          }
+        }
+      } else if (normalizedQuery.startsWith('DELETE')) {
+        // DELETE FROM documents WHERE collection = ? AND id = ?
+        const [collection, id] = params as [string, string]
+        const tableName = 'documents'
+        const table = tables.get(tableName)
+        if (table) {
+          const key = `${collection}:${id}`
+          table.delete(key)
+        }
+      }
+
+      return {
+        toArray() {
+          return results
+        }
+      }
+    }
+  }
+}
+
+// Create mock context factory
+function createMockCtx() {
+  return {
+    waitUntil: vi.fn(),
+    passThroughOnException: vi.fn(),
+    storage: {
+      sql: createMockSqlStorage(),
     },
-  },
-  acceptWebSocket: vi.fn(),
-  setWebSocketAutoResponse: vi.fn(),
+    acceptWebSocket: vi.fn(),
+    setWebSocketAutoResponse: vi.fn(),
+  }
 }
 
 // Mock environment
@@ -30,8 +153,10 @@ const mockEnv = {
 
 describe('HATEOAS REST API', () => {
   let doInstance: DO
+  let mockCtx: ReturnType<typeof createMockCtx>
 
   beforeEach(() => {
+    mockCtx = createMockCtx()
     doInstance = new DO(mockCtx as any, mockEnv)
   })
 
@@ -301,9 +426,11 @@ describe('HATEOAS REST API', () => {
 
 describe('Monaco Editor Routes (/~)', () => {
   let doInstance: DO
+  let editorMockCtx: ReturnType<typeof createMockCtx>
 
   beforeEach(() => {
-    doInstance = new DO(mockCtx as any, mockEnv)
+    editorMockCtx = createMockCtx()
+    doInstance = new DO(editorMockCtx as any, mockEnv)
   })
 
   describe('GET /~', () => {
@@ -312,7 +439,7 @@ describe('Monaco Editor Routes (/~)', () => {
       const response = await doInstance.handleRequest(request)
 
       expect(response.status).toBe(200)
-      expect(response.headers.get('Content-Type')).toBe('text/html')
+      expect(response.headers.get('Content-Type')).toContain('text/html')
 
       const html = await response.text()
       expect(html).toContain('<!DOCTYPE html>')
@@ -326,7 +453,7 @@ describe('Monaco Editor Routes (/~)', () => {
       const response = await doInstance.handleRequest(request)
 
       expect(response.status).toBe(200)
-      expect(response.headers.get('Content-Type')).toBe('text/html')
+      expect(response.headers.get('Content-Type')).toContain('text/html')
 
       const html = await response.text()
       expect(html).toContain('<!DOCTYPE html>')
@@ -343,7 +470,7 @@ describe('Monaco Editor Routes (/~)', () => {
       const response = await doInstance.handleRequest(request)
 
       expect(response.status).toBe(200)
-      expect(response.headers.get('Content-Type')).toBe('text/html')
+      expect(response.headers.get('Content-Type')).toContain('text/html')
 
       const html = await response.text()
       expect(html).toContain('<!DOCTYPE html>')

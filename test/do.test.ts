@@ -9,6 +9,51 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { DO } from '../src/do'
 import type { ListOptions, SearchOptions, FetchOptions, DoOptions } from '../src/types'
 
+// Mock WebSocketPair for Cloudflare Workers compatibility in Node.js
+class MockWebSocket {
+  readyState = 1
+  send = vi.fn()
+  close = vi.fn()
+  addEventListener = vi.fn()
+  removeEventListener = vi.fn()
+}
+
+// Mock Response with webSocket property for WebSocket upgrade responses
+const OriginalResponse = globalThis.Response
+class MockResponse extends OriginalResponse {
+  webSocket?: MockWebSocket
+  private _status?: number
+  constructor(body: BodyInit | null, init?: ResponseInit & { webSocket?: MockWebSocket }) {
+    // For WebSocket upgrades (101), we need to use a valid status for the super() call
+    // but then override the status property
+    const wsStatus = init?.status
+    const isWebSocketUpgrade = wsStatus === 101
+    const safeInit = isWebSocketUpgrade ? { ...init, status: 200 } : init
+    super(body, safeInit)
+    if (isWebSocketUpgrade) {
+      this._status = 101
+    }
+    if (init?.webSocket) {
+      this.webSocket = init.webSocket
+    }
+  }
+  get status() {
+    return this._status ?? super.status
+  }
+}
+globalThis.Response = MockResponse as typeof Response
+
+// Mock WebSocketPair globally
+class MockWebSocketPair {
+  0: MockWebSocket
+  1: MockWebSocket
+  constructor() {
+    this[0] = new MockWebSocket()
+    this[1] = new MockWebSocket()
+  }
+}
+(globalThis as unknown as { WebSocketPair: typeof MockWebSocketPair }).WebSocketPair = MockWebSocketPair
+
 /**
  * Create an in-memory SQLite mock for testing
  * This simulates the Cloudflare Durable Objects SQLite storage API
@@ -44,17 +89,44 @@ function createMockSqlStorage() {
         const key = `${collection}:${id}`
         table.set(key, { collection, id, data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
       } else if (normalizedQuery.startsWith('SELECT')) {
-        // SELECT data FROM documents WHERE collection = ? AND id = ?
         const tableName = 'documents'
         const table = tables.get(tableName)
 
         if (table) {
           if (query.includes('WHERE collection = ? AND id = ?')) {
+            // Get single document
             const [collection, id] = params as [string, string]
             const key = `${collection}:${id}`
             const row = table.get(key)
             if (row) {
               results.push({ data: row.data })
+            }
+          } else if (query.includes('WHERE collection IN') && query.includes('LIKE')) {
+            // Search with specific collections
+            const collections = params.slice(0, -2) as string[]
+            const searchPattern = params[params.length - 2] as string
+            const limit = params[params.length - 1] as number
+            const pattern = searchPattern.replace(/%/g, '')
+
+            for (const [, row] of table.entries()) {
+              if (results.length >= limit) break
+              const rowCollection = row.collection as string
+              const rowData = row.data as string
+              if (collections.includes(rowCollection) && rowData.toLowerCase().includes(pattern.toLowerCase())) {
+                results.push({ collection: row.collection, id: row.id, data: row.data })
+              }
+            }
+          } else if (query.includes('WHERE data LIKE')) {
+            // Search all collections
+            const [searchPattern, limit] = params as [string, number]
+            const pattern = searchPattern.replace(/%/g, '')
+
+            for (const [, row] of table.entries()) {
+              if (results.length >= limit) break
+              const rowData = row.data as string
+              if (rowData.toLowerCase().includes(pattern.toLowerCase())) {
+                results.push({ collection: row.collection, id: row.id, data: row.data })
+              }
             }
           } else if (query.includes('WHERE collection = ?')) {
             // List query with pagination
