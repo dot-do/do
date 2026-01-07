@@ -3,6 +3,7 @@ import { defineConfig } from 'tsup'
 export default defineConfig({
   entry: {
     index: 'src/index.ts',
+    'types/index': 'src/types/index.ts',
     'rpc/index': 'src/rpc/index.ts',
     'mcp/index': 'src/mcp/index.ts',
   },
@@ -12,5 +13,5 @@ export default defineConfig({
   sourcemap: true,
   splitting: false,
   treeshake: true,
-  external: ['agents', 'wrangler'],
+  external: ['agents', 'wrangler', 'cloudflare:workers'],
 })

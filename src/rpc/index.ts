@@ -1,16 +1,18 @@
 /**
- * @dotdo/do/rpc - RPC Layer
+ * @dotdo/rpc - RPC Layer
  *
  * Implements RpcTarget pattern with capnweb-style HTTP/WS support.
+ * This module is self-contained and can be extracted as @dotdo/rpc.
  */
 
-import type { RpcRequest } from '../types'
+// Re-export all types
+export * from './types'
 
 // Re-export JSON-RPC 2.0 implementation
 export * from './json-rpc'
 
-/** Method handler type for RPC methods */
-type RpcMethodHandler = (...args: unknown[]) => Promise<unknown>
+// Import types for internal use
+import type { RpcRequest, RpcBatchResponse, RpcMethodHandler, BatchItem, RpcStub, BatchedRpcOptions } from './types'
 
 /**
  * Base class for RPC targets
@@ -37,13 +39,13 @@ export class RpcTarget {
     // First check if there's a registered handler
     const fn = this.methodHandlers.get(method)
     if (fn) {
-      return fn.apply(this, params)
+      return await fn.apply(this, params)
     }
 
     // Then check if the method exists directly on the instance
     const instanceMethod = (this as unknown as Record<string, unknown>)[method]
     if (typeof instanceMethod === 'function') {
-      return instanceMethod.apply(this, params)
+      return await instanceMethod.apply(this, params)
     }
 
     throw new Error(`Method not found: ${method}`)
@@ -103,12 +105,24 @@ export async function newWorkersRpcResponse(
       })
     }
 
-    const result = await target.invoke(req.method, req.params)
-
-    return new Response(JSON.stringify({ id: req.id, result }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    try {
+      const result = await target.invoke(req.method, req.params)
+      return new Response(JSON.stringify({ id: req.id, result }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    } catch (error) {
+      return new Response(
+        JSON.stringify({
+          id: req.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    }
   } catch (error) {
     return new Response(
       JSON.stringify({
@@ -126,20 +140,12 @@ export async function newWorkersRpcResponse(
  * Batched RPC executor for coalescing multiple requests
  */
 export class BatchedRpcExecutor {
-  private stub: { fetch: (url: string, init: RequestInit) => Promise<Response> }
-  private options: { maxBatchSize: number; flushInterval: number }
-  private queue: Array<{
-    method: string
-    params: Record<string, unknown>
-    resolve: (value: unknown) => void
-    reject: (error: Error) => void
-  }> = []
+  private stub: RpcStub
+  private options: Required<BatchedRpcOptions>
+  private queue: BatchItem[] = []
   private flushTimer: ReturnType<typeof setTimeout> | null = null
 
-  constructor(
-    stub: { fetch: (url: string, init: RequestInit) => Promise<Response> },
-    options: { maxBatchSize?: number; flushInterval?: number } = {}
-  ) {
+  constructor(stub: RpcStub, options: BatchedRpcOptions = {}) {
     this.stub = stub
     this.options = {
       maxBatchSize: options.maxBatchSize ?? 100,
@@ -190,9 +196,7 @@ export class BatchedRpcExecutor {
         ),
       })
 
-      const { results } = (await response.json()) as {
-        results: Array<{ id: string; result?: unknown; error?: string }>
-      }
+      const { results } = (await response.json()) as RpcBatchResponse
 
       batch.forEach((item, index) => {
         const result = results[index]

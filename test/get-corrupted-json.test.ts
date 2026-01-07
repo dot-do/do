@@ -579,9 +579,9 @@ describe('get() Corrupted JSON Handling (workers-819)', () => {
       const corruptedData = new Map<string, string>()
       corruptedData.set('concurrent:1', '{broken1')
       corruptedData.set('concurrent:2', '{broken2')
-      corruptedData.set('concurrent:3', '{"valid": true}')
+      corruptedData.set('concurrent:3', '{"id": "3", "valid": true}')
       corruptedData.set('concurrent:4', 'broken4}')
-      corruptedData.set('concurrent:5', '{"also": "valid"}')
+      corruptedData.set('concurrent:5', '{"id": "5", "also": "valid"}')
 
       const ctx = createMockCtxWithCorruptedData(corruptedData)
       const doInstance = new DO(ctx as any, mockEnv)
@@ -597,9 +597,9 @@ describe('get() Corrupted JSON Handling (workers-819)', () => {
 
       expect(results[0]).toBeNull() // corrupted
       expect(results[1]).toBeNull() // corrupted
-      expect(results[2]).toEqual({ valid: true }) // valid
+      expect(results[2]).toEqual({ id: '3', valid: true }) // valid
       expect(results[3]).toBeNull() // corrupted
-      expect(results[4]).toEqual({ also: 'valid' }) // valid
+      expect(results[4]).toEqual({ id: '5', also: 'valid' }) // valid
     })
 
     it('should not leak corrupted data state between calls', async () => {
@@ -618,8 +618,9 @@ describe('get() Corrupted JSON Handling (workers-819)', () => {
       expect(created.id).toBe('valid')
 
       // Get the valid document - should not be affected by previous corruption
+      // Note: create() adds createdAt and updatedAt fields
       const valid = await doInstance.get('isolation', 'valid')
-      expect(valid).toEqual({ id: 'valid', name: 'Test' })
+      expect(valid).toMatchObject({ id: 'valid', name: 'Test' })
     })
 
     it('should handle get after document was corrupted by external write', async () => {
@@ -674,13 +675,14 @@ describe('get() Corrupted JSON Handling (workers-819)', () => {
 
     it('should handle JSON with script injection attempts', async () => {
       const corruptedData = new Map<string, string>()
-      corruptedData.set('security:xss1', '{"name": "<script>alert(1)</script>"}')
+      // Documents require an id field for validation
+      corruptedData.set('security:xss1', '{"id": "xss1", "name": "<script>alert(1)</script>"}')
 
       const ctx = createMockCtxWithCorruptedData(corruptedData)
       const doInstance = new DO(ctx as any, mockEnv)
 
       // This is valid JSON, just with HTML content
-      const result = await doInstance.get<{ name: string }>('security', 'xss1')
+      const result = await doInstance.get<{ id: string; name: string }>('security', 'xss1')
 
       // Should parse correctly - XSS prevention is responsibility of output encoding
       expect(result?.name).toBe('<script>alert(1)</script>')

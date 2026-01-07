@@ -106,12 +106,8 @@ describe('ActionRepository', () => {
   describe('Repository Interface', () => {
     it('should be importable from repositories module', async () => {
       // This test verifies the module structure exists
-      await expect(
-        import('../src/repositories/action-repository')
-      ).rejects.toThrow()
-      // When implemented, this should resolve:
-      // const { ActionRepository } = await import('../src/repositories/action-repository')
-      // expect(ActionRepository).toBeDefined()
+      const { ActionRepository } = await import('../src/repositories/action-repository')
+      expect(ActionRepository).toBeDefined()
     })
 
     it('should implement the Repository interface', () => {

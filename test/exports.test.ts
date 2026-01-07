@@ -31,6 +31,37 @@ describe('Package Exports', () => {
     })
   })
 
+  describe('@dotdo/do/types export', () => {
+    it('should export schema type classes from /types subpath', async () => {
+      const exports = await import('../src/types/index')
+      expect(exports).toBeDefined()
+      // Schema classes should be exported
+      expect(exports.StringType).toBeDefined()
+      expect(exports.NumberType).toBeDefined()
+      expect(exports.BooleanType).toBeDefined()
+      expect(exports.ArrayType).toBeDefined()
+      expect(exports.ObjectType).toBeDefined()
+      expect(exports.SchemaType).toBeDefined()
+      expect(exports.BaseType).toBeDefined()
+      expect(exports.RefType).toBeDefined()
+    })
+
+    it('should export modifier type classes', async () => {
+      const exports = await import('../src/types/index')
+      expect(exports.RequiredType).toBeDefined()
+      expect(exports.OptionalType).toBeDefined()
+      expect(exports.DefaultType).toBeDefined()
+      expect(exports.TransformType).toBeDefined()
+    })
+
+    it('should export schema type classes that are proper constructors', async () => {
+      const { StringType, NumberType, BaseType } = await import('../src/types/index')
+      expect(typeof StringType).toBe('function')
+      expect(typeof NumberType).toBe('function')
+      expect(typeof BaseType).toBe('function')
+    })
+  })
+
   describe('@dotdo/do/rpc export', () => {
     it('should export RPC utilities from /rpc subpath', async () => {
       const exports = await import('../src/rpc')

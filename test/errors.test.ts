@@ -44,38 +44,29 @@ describe('Custom Error Classes', () => {
   describe('Module Structure', () => {
     it('should be importable from errors module', async () => {
       // This test verifies the module structure exists
-      await expect(
-        import('../src/errors')
-      ).rejects.toThrow()
-
-      // When implemented, this should resolve:
-      // const errors = await import('../src/errors')
-      // expect(errors.DOError).toBeDefined()
-      // expect(errors.ValidationError).toBeDefined()
-      // expect(errors.NotFoundError).toBeDefined()
+      const errors = await import('../src/errors')
+      expect(errors.DoError).toBeDefined()
+      expect(errors.TimeoutError).toBeDefined()
+      expect(errors.SandboxError).toBeDefined()
+      expect(errors.ExecutionError).toBeDefined()
+      expect(errors.MemoryError).toBeDefined()
     })
 
     it('should export all error classes', async () => {
-      // Will fail until implemented
-      await expect(import('../src/errors')).rejects.toThrow()
-
-      // When implemented:
-      // const {
-      //   DOError,
-      //   ValidationError,
-      //   NotFoundError,
-      //   ConflictError,
-      //   AuthorizationError,
-      //   StorageError,
-      //   TimeoutError,
-      // } = await import('../src/errors')
-      // expect(DOError).toBeDefined()
-      // expect(ValidationError).toBeDefined()
-      // expect(NotFoundError).toBeDefined()
-      // expect(ConflictError).toBeDefined()
-      // expect(AuthorizationError).toBeDefined()
-      // expect(StorageError).toBeDefined()
-      // expect(TimeoutError).toBeDefined()
+      const {
+        DoError,
+        DoErrorCode,
+        TimeoutError,
+        SandboxError,
+        ExecutionError,
+        MemoryError,
+      } = await import('../src/errors')
+      expect(DoError).toBeDefined()
+      expect(DoErrorCode).toBeDefined()
+      expect(TimeoutError).toBeDefined()
+      expect(SandboxError).toBeDefined()
+      expect(ExecutionError).toBeDefined()
+      expect(MemoryError).toBeDefined()
     })
   })
 

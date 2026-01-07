@@ -263,8 +263,11 @@ describe('BatchedRpcExecutor', () => {
     const executor = new BatchedRpcExecutor(mockStub as any)
     const promise = executor.execute('method1', {})
 
+    // Set up the rejection expectation BEFORE flushing to avoid unhandled rejection
+    const expectation = expect(promise).rejects.toThrow('Error message')
+
     await executor.flush()
 
-    await expect(promise).rejects.toThrow('Error message')
+    await expectation
   })
 })

@@ -7,31 +7,11 @@
  */
 
 // ============================================================================
-// RpcTarget Types
+// RpcTarget Types (re-exported from @dotdo/rpc)
 // ============================================================================
 
-/**
- * Method allowlist for RpcTarget
- */
-export type AllowedMethods = Set<string>
-
-/**
- * RPC request format
- */
-export interface RpcRequest {
-  id: string
-  method: string
-  params: unknown[]
-}
-
-/**
- * RPC response format
- */
-export interface RpcResponse {
-  id: string
-  result?: unknown
-  error?: string
-}
+// Re-export RPC types from the self-contained RPC module
+export type { AllowedMethods, RpcRequest, RpcResponse, RpcBatchResponse } from './rpc/types'
 
 // ============================================================================
 // Entity Types (ai-database compatible)

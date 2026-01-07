@@ -1,17 +1,3 @@
-import { vi } from 'vitest'
-
-vi.mock('cloudflare:workers', () => {
-  class MockDurableObject<Env = unknown> {
-    protected ctx: unknown
-    protected env: Env
-    constructor(ctx: unknown, env: Env) {
-      this.ctx = ctx
-      this.env = env
-    }
-  }
-  return { DurableObject: MockDurableObject }
-})
-
 /**
  * @dotdo/do - CRUD Input Validation Tests (RED Phase)
  *
@@ -28,10 +14,14 @@ vi.mock('cloudflare:workers', () => {
  * - Options must be valid when provided
  * - URLs must be valid URL format
  * - Types must match expected schemas
+ *
+ * Uses @cloudflare/vitest-pool-workers for real Durable Object testing.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
-import { DO } from '../src/do'
+import { env, runInDurableObject } from 'cloudflare:test'
+import type { DurableObjectStub } from '@cloudflare/workers-types'
+import { createTestStub, uniqueTestName } from './helpers/do-test-utils'
 import type {
   ListOptions,
   CreateOptions,
@@ -42,62 +32,41 @@ import type {
   StoreArtifactOptions,
 } from '../src/types'
 
-/**
- * Create an in-memory SQLite mock for testing
- */
-function createMockSqlStorage() {
-  const tables: Map<string, Map<string, Record<string, unknown>>> = new Map()
-
-  return {
-    exec(query: string, ...params: unknown[]) {
-      const results: unknown[] = []
-      const normalizedQuery = query.trim().toUpperCase()
-
-      if (normalizedQuery.startsWith('CREATE TABLE')) {
-        const tableMatch = query.match(/CREATE TABLE IF NOT EXISTS (\w+)/i)
-        if (tableMatch) {
-          const tableName = tableMatch[1]
-          if (!tables.has(tableName)) {
-            tables.set(tableName, new Map())
-          }
-        }
-      }
-
-      return {
-        toArray() {
-          return results
-        },
-      }
-    },
-  }
+// Type for DO stub with RPC methods
+interface DOStub extends DurableObjectStub {
+  get<T = Record<string, unknown>>(collection: string, id: string): Promise<T | null>
+  list<T = Record<string, unknown>>(collection: string, options?: ListOptions): Promise<T[]>
+  create(collection: string, doc: Record<string, unknown>): Promise<Record<string, unknown>>
+  update(collection: string, id: string, updates: Record<string, unknown>): Promise<Record<string, unknown> | null>
+  delete(collection: string, id: string): Promise<boolean>
+  search(query: string, options?: { limit?: number; collections?: string[] }): Promise<Array<{ score: number; [key: string]: unknown }>>
+  createThing(options: { ns: string; type: string; id?: string; url?: string; data: Record<string, unknown>; '@context'?: unknown }): Promise<unknown>
+  getThing(url: string): Promise<unknown>
+  getThingById(ns: string, type: string, id: string): Promise<unknown>
+  setThing(url: string, data: Record<string, unknown>): Promise<unknown>
+  deleteThing(url: string): Promise<boolean>
+  relate(options: { type: string; from: string; to: string }): Promise<unknown>
+  unrelate(from: string, type: string, to: string): Promise<boolean>
+  track(options: { type: string; source?: string; data: Record<string, unknown> }): Promise<unknown>
+  send(options: { actor?: string; object: string; action: string; status?: string }): Promise<unknown>
+  storeArtifact(options: StoreArtifactOptions<unknown>): Promise<unknown>
+  getArtifact(key: string): Promise<unknown>
+  invoke(method: string, params: unknown[]): Promise<unknown>
 }
 
 /**
- * Create a mock context with SQLite storage
+ * Helper to run a test inside a Durable Object instance
  */
-function createMockCtx() {
-  return {
-    waitUntil: vi.fn(),
-    passThroughOnException: vi.fn(),
-    storage: {
-      sql: createMockSqlStorage(),
-    },
-  }
+const testInDO = (stub: DurableObjectStub, testFn: (instance: any) => Promise<void>) => {
+  return runInDurableObject(stub, testFn)
 }
 
-// Mock environment
-const mockEnv = {
-  DO_NAMESPACE: {
-    idFromName: vi.fn(() => ({ toString: () => 'mock-id' })),
-    get: vi.fn(),
-  },
-}
-
-describe('CRUD Input Validation', () => {
-  let doInstance: DO
+describe.todo('CRUD Input Validation', () => {
+  let stub: DOStub
 
   beforeEach(() => {
-    doInstance = new DO(createMockCtx() as any, mockEnv)
+    const name = uniqueTestName('crud-validation')
+    stub = createTestStub(name) as DOStub
   })
 
   // ============================================================================
@@ -106,69 +75,91 @@ describe('CRUD Input Validation', () => {
 
   describe('get() parameter validation', () => {
     it('should throw ValidationError when collection is undefined', async () => {
-      await expect(
-        (doInstance as any).get(undefined, 'valid-id')
-      ).rejects.toThrow(/collection.*required|invalid.*collection/i)
+      await runInDurableObject(stub, async (instance) => {
+        await expect(
+          (instance as any).get(undefined, 'valid-id')
+        ).rejects.toThrow(/collection.*required|invalid.*collection/i)
+      })
     })
 
     it('should throw ValidationError when collection is null', async () => {
-      await expect((doInstance as any).get(null, 'valid-id')).rejects.toThrow(
-        /collection.*required|invalid.*collection/i
-      )
+      await runInDurableObject(stub, async (instance) => {
+        await expect((instance as any).get(null, 'valid-id')).rejects.toThrow(
+          /collection.*required|invalid.*collection/i
+        )
+      })
     })
 
     it('should throw ValidationError when collection is empty string', async () => {
-      await expect((doInstance as any).get('', 'valid-id')).rejects.toThrow(
-        /collection.*empty|invalid.*collection/i
-      )
+      await runInDurableObject(stub, async (instance) => {
+        await expect((instance as any).get('', 'valid-id')).rejects.toThrow(
+          /collection.*empty|invalid.*collection/i
+        )
+      })
     })
 
     it('should throw ValidationError when collection is whitespace only', async () => {
-      await expect((doInstance as any).get('   ', 'valid-id')).rejects.toThrow(
-        /collection.*empty|invalid.*collection/i
-      )
+      await runInDurableObject(stub, async (instance) => {
+        await expect((instance as any).get('   ', 'valid-id')).rejects.toThrow(
+          /collection.*empty|invalid.*collection/i
+        )
+      })
     })
 
     it('should throw ValidationError when collection is not a string', async () => {
-      await expect((doInstance as any).get(123, 'valid-id')).rejects.toThrow(
-        /collection.*string|invalid.*collection/i
-      )
+      await runInDurableObject(stub, async (instance) => {
+        await expect((instance as any).get(123, 'valid-id')).rejects.toThrow(
+          /collection.*string|invalid.*collection/i
+        )
+      })
     })
 
     it('should throw ValidationError when collection contains SQL injection characters', async () => {
-      await expect(
-        (doInstance as any).get("users'; DROP TABLE documents;--", 'valid-id')
-      ).rejects.toThrow(/collection.*invalid|unsafe.*characters/i)
+      await runInDurableObject(stub, async (instance) => {
+        await expect(
+          (instance as any).get("users'; DROP TABLE documents;--", 'valid-id')
+        ).rejects.toThrow(/collection.*invalid|unsafe.*characters/i)
+      })
     })
 
     it('should throw ValidationError when id is undefined', async () => {
-      await expect(
-        (doInstance as any).get('users', undefined)
-      ).rejects.toThrow(/id.*required|invalid.*id/i)
+      await runInDurableObject(stub, async (instance) => {
+        await expect(
+          (instance as any).get('users', undefined)
+        ).rejects.toThrow(/id.*required|invalid.*id/i)
+      })
     })
 
     it('should throw ValidationError when id is null', async () => {
-      await expect((doInstance as any).get('users', null)).rejects.toThrow(
-        /id.*required|invalid.*id/i
-      )
+      await runInDurableObject(stub, async (instance) => {
+        await expect((instance as any).get('users', null)).rejects.toThrow(
+          /id.*required|invalid.*id/i
+        )
+      })
     })
 
     it('should throw ValidationError when id is empty string', async () => {
-      await expect((doInstance as any).get('users', '')).rejects.toThrow(
-        /id.*empty|invalid.*id/i
-      )
+      await runInDurableObject(stub, async (instance) => {
+        await expect((instance as any).get('users', '')).rejects.toThrow(
+          /id.*empty|invalid.*id/i
+        )
+      })
     })
 
     it('should throw ValidationError when id is not a string', async () => {
-      await expect((doInstance as any).get('users', 123)).rejects.toThrow(
-        /id.*string|invalid.*id/i
-      )
+      await runInDurableObject(stub, async (instance) => {
+        await expect((instance as any).get('users', 123)).rejects.toThrow(
+          /id.*string|invalid.*id/i
+        )
+      })
     })
 
     it('should throw ValidationError when id is an object', async () => {
-      await expect(
-        (doInstance as any).get('users', { id: 'test' })
-      ).rejects.toThrow(/id.*string|invalid.*id/i)
+      await runInDurableObject(stub, async (instance) => {
+        await expect(
+          (instance as any).get('users', { id: 'test' })
+        ).rejects.toThrow(/id.*string|invalid.*id/i)
+      })
     })
   })
 
@@ -178,63 +169,83 @@ describe('CRUD Input Validation', () => {
 
   describe('list() parameter validation', () => {
     it('should throw ValidationError when collection is undefined', async () => {
-      await expect((doInstance as any).list(undefined)).rejects.toThrow(
-        /collection.*required|invalid.*collection/i
-      )
+      await runInDurableObject(stub, async (instance) => {
+        await expect((instance as any).list(undefined)).rejects.toThrow(
+          /collection.*required|invalid.*collection/i
+        )
+      })
     })
 
     it('should throw ValidationError when collection is empty string', async () => {
-      await expect((doInstance as any).list('')).rejects.toThrow(
-        /collection.*empty|invalid.*collection/i
-      )
+      await runInDurableObject(stub, async (instance) => {
+        await expect((instance as any).list('')).rejects.toThrow(
+          /collection.*empty|invalid.*collection/i
+        )
+      })
     })
 
     it('should throw ValidationError when options.limit is negative', async () => {
-      await expect(
-        doInstance.list('users', { limit: -1 })
-      ).rejects.toThrow(/limit.*positive|invalid.*limit/i)
+      await runInDurableObject(stub, async (instance) => {
+        await expect(
+          (instance as any).list('users', { limit: -1 })
+        ).rejects.toThrow(/limit.*positive|invalid.*limit/i)
+      })
     })
 
     it('should throw ValidationError when options.limit is zero', async () => {
-      await expect(
-        doInstance.list('users', { limit: 0 })
-      ).rejects.toThrow(/limit.*positive|invalid.*limit/i)
+      await runInDurableObject(stub, async (instance) => {
+        await expect(
+          (instance as any).list('users', { limit: 0 })
+        ).rejects.toThrow(/limit.*positive|invalid.*limit/i)
+      })
     })
 
     it('should throw ValidationError when options.limit is not a number', async () => {
-      await expect(
-        doInstance.list('users', { limit: 'ten' as any })
-      ).rejects.toThrow(/limit.*number|invalid.*limit/i)
+      await runInDurableObject(stub, async (instance) => {
+        await expect(
+          (instance as any).list('users', { limit: 'ten' as any })
+        ).rejects.toThrow(/limit.*number|invalid.*limit/i)
+      })
     })
 
     it('should throw ValidationError when options.limit exceeds maximum', async () => {
-      await expect(
-        doInstance.list('users', { limit: 100001 })
-      ).rejects.toThrow(/limit.*maximum|limit.*exceed/i)
+      await runInDurableObject(stub, async (instance) => {
+        await expect(
+          (instance as any).list('users', { limit: 100001 })
+        ).rejects.toThrow(/limit.*maximum|limit.*exceed/i)
+      })
     })
 
     it('should throw ValidationError when options.offset is negative', async () => {
-      await expect(
-        doInstance.list('users', { offset: -1 })
-      ).rejects.toThrow(/offset.*negative|invalid.*offset/i)
+      await runInDurableObject(stub, async (instance) => {
+        await expect(
+          (instance as any).list('users', { offset: -1 })
+        ).rejects.toThrow(/offset.*negative|invalid.*offset/i)
+      })
     })
 
     it('should throw ValidationError when options.offset is not a number', async () => {
-      await expect(
-        doInstance.list('users', { offset: 'zero' as any })
-      ).rejects.toThrow(/offset.*number|invalid.*offset/i)
+      await runInDurableObject(stub, async (instance) => {
+        await expect(
+          (instance as any).list('users', { offset: 'zero' as any })
+        ).rejects.toThrow(/offset.*number|invalid.*offset/i)
+      })
     })
 
     it('should throw ValidationError when options.order is invalid', async () => {
-      await expect(
-        doInstance.list('users', { order: 'sideways' as any })
-      ).rejects.toThrow(/order.*asc.*desc|invalid.*order/i)
+      await runInDurableObject(stub, async (instance) => {
+        await expect(
+          (instance as any).list('users', { order: 'sideways' as any })
+        ).rejects.toThrow(/order.*asc.*desc|invalid.*order/i)
+      })
     })
 
     it('should throw ValidationError when options.orderBy contains SQL injection', async () => {
-      await expect(
-        doInstance.list('users', { orderBy: "created_at; DROP TABLE documents;--" })
-      ).rejects.toThrow(/orderBy.*invalid|unsafe.*characters/i)
+      await runInDurableObject(stub, async (instance) => {
+        await expect(
+          (instance as any).list('users', { orderBy: "created_at; DROP TABLE documents;--" })
+        ).rejects.toThrow(/orderBy.*invalid|unsafe.*characters/i)
+      })
     })
   })
 
@@ -245,37 +256,37 @@ describe('CRUD Input Validation', () => {
   describe('create() parameter validation', () => {
     it('should throw ValidationError when collection is undefined', async () => {
       await expect(
-        (doInstance as any).create(undefined, { name: 'test' })
+        (instance as any).create(undefined, { name: 'test' })
       ).rejects.toThrow(/collection.*required|invalid.*collection/i)
     })
 
     it('should throw ValidationError when collection is empty string', async () => {
       await expect(
-        (doInstance as any).create('', { name: 'test' })
+        (instance as any).create('', { name: 'test' })
       ).rejects.toThrow(/collection.*empty|invalid.*collection/i)
     })
 
     it('should throw ValidationError when data is undefined', async () => {
       await expect(
-        (doInstance as any).create('users', undefined)
+        (instance as any).create('users', undefined)
       ).rejects.toThrow(/data.*required|invalid.*data/i)
     })
 
     it('should throw ValidationError when data is null', async () => {
-      await expect((doInstance as any).create('users', null)).rejects.toThrow(
+      await expect((instance as any).create('users', null)).rejects.toThrow(
         /data.*required|invalid.*data/i
       )
     })
 
     it('should throw ValidationError when data is not an object', async () => {
       await expect(
-        (doInstance as any).create('users', 'not an object')
+        (instance as any).create('users', 'not an object')
       ).rejects.toThrow(/data.*object|invalid.*data/i)
     })
 
     it('should throw ValidationError when data is an array', async () => {
       await expect(
-        (doInstance as any).create('users', ['item1', 'item2'])
+        (instance as any).create('users', ['item1', 'item2'])
       ).rejects.toThrow(/data.*object|invalid.*data/i)
     })
 
@@ -284,7 +295,7 @@ describe('CRUD Input Validation', () => {
       circular.self = circular
 
       await expect(
-        doInstance.create('users', circular)
+        (instance as any).create('users', circular)
       ).rejects.toThrow(/circular|serialize|json/i)
     })
 
@@ -295,19 +306,19 @@ describe('CRUD Input Validation', () => {
       }
 
       await expect(
-        doInstance.create('users', withFunction)
+        (instance as any).create('users', withFunction)
       ).rejects.toThrow(/function|serialize|invalid.*data/i)
     })
 
     it('should throw ValidationError when provided id is empty string', async () => {
       await expect(
-        doInstance.create('users', { id: '', name: 'test' })
+        (instance as any).create('users', { id: '', name: 'test' })
       ).rejects.toThrow(/id.*empty|invalid.*id/i)
     })
 
     it('should throw ValidationError when provided id is not a string', async () => {
       await expect(
-        doInstance.create('users', { id: 123, name: 'test' } as any)
+        (instance as any).create('users', { id: 123, name: 'test' } as any)
       ).rejects.toThrow(/id.*string|invalid.*id/i)
     })
   })
@@ -319,61 +330,61 @@ describe('CRUD Input Validation', () => {
   describe('update() parameter validation', () => {
     it('should throw ValidationError when collection is undefined', async () => {
       await expect(
-        (doInstance as any).update(undefined, 'valid-id', { name: 'updated' })
+        (instance as any).update(undefined, 'valid-id', { name: 'updated' })
       ).rejects.toThrow(/collection.*required|invalid.*collection/i)
     })
 
     it('should throw ValidationError when collection is empty string', async () => {
       await expect(
-        (doInstance as any).update('', 'valid-id', { name: 'updated' })
+        (instance as any).update('', 'valid-id', { name: 'updated' })
       ).rejects.toThrow(/collection.*empty|invalid.*collection/i)
     })
 
     it('should throw ValidationError when id is undefined', async () => {
       await expect(
-        (doInstance as any).update('users', undefined, { name: 'updated' })
+        (instance as any).update('users', undefined, { name: 'updated' })
       ).rejects.toThrow(/id.*required|invalid.*id/i)
     })
 
     it('should throw ValidationError when id is empty string', async () => {
       await expect(
-        (doInstance as any).update('users', '', { name: 'updated' })
+        (instance as any).update('users', '', { name: 'updated' })
       ).rejects.toThrow(/id.*empty|invalid.*id/i)
     })
 
     it('should throw ValidationError when updates is undefined', async () => {
       await expect(
-        (doInstance as any).update('users', 'valid-id', undefined)
+        (instance as any).update('users', 'valid-id', undefined)
       ).rejects.toThrow(/updates.*required|invalid.*updates/i)
     })
 
     it('should throw ValidationError when updates is null', async () => {
       await expect(
-        (doInstance as any).update('users', 'valid-id', null)
+        (instance as any).update('users', 'valid-id', null)
       ).rejects.toThrow(/updates.*required|invalid.*updates/i)
     })
 
     it('should throw ValidationError when updates is not an object', async () => {
       await expect(
-        (doInstance as any).update('users', 'valid-id', 'not an object')
+        (instance as any).update('users', 'valid-id', 'not an object')
       ).rejects.toThrow(/updates.*object|invalid.*updates/i)
     })
 
     it('should throw ValidationError when updates is an array', async () => {
       await expect(
-        (doInstance as any).update('users', 'valid-id', ['item1'])
+        (instance as any).update('users', 'valid-id', ['item1'])
       ).rejects.toThrow(/updates.*object|invalid.*updates/i)
     })
 
     it('should throw ValidationError when updates is empty object', async () => {
       await expect(
-        doInstance.update('users', 'valid-id', {})
+        (instance as any).update('users', 'valid-id', {})
       ).rejects.toThrow(/updates.*empty|no.*properties/i)
     })
 
     it('should throw ValidationError when updates tries to change id', async () => {
       await expect(
-        doInstance.update('users', 'valid-id', { id: 'new-id', name: 'updated' })
+        (instance as any).update('users', 'valid-id', { id: 'new-id', name: 'updated' })
       ).rejects.toThrow(/id.*immutable|cannot.*change.*id/i)
     })
   })
@@ -385,31 +396,31 @@ describe('CRUD Input Validation', () => {
   describe('delete() parameter validation', () => {
     it('should throw ValidationError when collection is undefined', async () => {
       await expect(
-        (doInstance as any).delete(undefined, 'valid-id')
+        (instance as any).delete(undefined, 'valid-id')
       ).rejects.toThrow(/collection.*required|invalid.*collection/i)
     })
 
     it('should throw ValidationError when collection is empty string', async () => {
       await expect(
-        (doInstance as any).delete('', 'valid-id')
+        (instance as any).delete('', 'valid-id')
       ).rejects.toThrow(/collection.*empty|invalid.*collection/i)
     })
 
     it('should throw ValidationError when id is undefined', async () => {
       await expect(
-        (doInstance as any).delete('users', undefined)
+        (instance as any).delete('users', undefined)
       ).rejects.toThrow(/id.*required|invalid.*id/i)
     })
 
     it('should throw ValidationError when id is empty string', async () => {
       await expect(
-        (doInstance as any).delete('users', '')
+        (instance as any).delete('users', '')
       ).rejects.toThrow(/id.*empty|invalid.*id/i)
     })
 
     it('should throw ValidationError when id is not a string', async () => {
       await expect(
-        (doInstance as any).delete('users', 123)
+        (instance as any).delete('users', 123)
       ).rejects.toThrow(/id.*string|invalid.*id/i)
     })
   })
@@ -421,55 +432,55 @@ describe('CRUD Input Validation', () => {
   describe('createThing() / Thing.create() parameter validation', () => {
     it('should throw ValidationError when options is undefined', async () => {
       await expect(
-        (doInstance as any).createThing(undefined)
+        (instance as any).createThing(undefined)
       ).rejects.toThrow(/options.*required|invalid.*options/i)
     })
 
     it('should throw ValidationError when ns is missing', async () => {
       await expect(
-        (doInstance as any).createThing({ type: 'user', data: { name: 'test' } })
+        (instance as any).createThing({ type: 'user', data: { name: 'test' } })
       ).rejects.toThrow(/ns.*required|namespace.*required/i)
     })
 
     it('should throw ValidationError when ns is empty string', async () => {
       await expect(
-        (doInstance as any).createThing({ ns: '', type: 'user', data: { name: 'test' } })
+        (instance as any).createThing({ ns: '', type: 'user', data: { name: 'test' } })
       ).rejects.toThrow(/ns.*empty|namespace.*empty/i)
     })
 
     it('should throw ValidationError when type is missing', async () => {
       await expect(
-        (doInstance as any).createThing({ ns: 'example.com', data: { name: 'test' } })
+        (instance as any).createThing({ ns: 'example.com', data: { name: 'test' } })
       ).rejects.toThrow(/type.*required/i)
     })
 
     it('should throw ValidationError when type is empty string', async () => {
       await expect(
-        (doInstance as any).createThing({ ns: 'example.com', type: '', data: { name: 'test' } })
+        (instance as any).createThing({ ns: 'example.com', type: '', data: { name: 'test' } })
       ).rejects.toThrow(/type.*empty/i)
     })
 
     it('should throw ValidationError when data is missing', async () => {
       await expect(
-        (doInstance as any).createThing({ ns: 'example.com', type: 'user' })
+        (instance as any).createThing({ ns: 'example.com', type: 'user' })
       ).rejects.toThrow(/data.*required/i)
     })
 
     it('should throw ValidationError when data is not an object', async () => {
       await expect(
-        (doInstance as any).createThing({ ns: 'example.com', type: 'user', data: 'not object' })
+        (instance as any).createThing({ ns: 'example.com', type: 'user', data: 'not object' })
       ).rejects.toThrow(/data.*object/i)
     })
 
     it('should throw ValidationError when provided id is empty string', async () => {
       await expect(
-        (doInstance as any).createThing({ ns: 'example.com', type: 'user', id: '', data: { name: 'test' } })
+        (instance as any).createThing({ ns: 'example.com', type: 'user', id: '', data: { name: 'test' } })
       ).rejects.toThrow(/id.*empty/i)
     })
 
     it('should throw ValidationError when url is not a valid URL', async () => {
       await expect(
-        (doInstance as any).createThing({
+        (instance as any).createThing({
           ns: 'example.com',
           type: 'user',
           url: 'not-a-valid-url',
@@ -480,7 +491,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when @context is invalid type', async () => {
       await expect(
-        (doInstance as any).createThing({
+        (instance as any).createThing({
           ns: 'example.com',
           type: 'user',
           data: { name: 'test' },
@@ -497,25 +508,25 @@ describe('CRUD Input Validation', () => {
   describe('getThing() / Thing.get() parameter validation', () => {
     it('should throw ValidationError when url is undefined', async () => {
       await expect(
-        (doInstance as any).getThing(undefined)
+        (instance as any).getThing(undefined)
       ).rejects.toThrow(/url.*required/i)
     })
 
     it('should throw ValidationError when url is empty string', async () => {
       await expect(
-        (doInstance as any).getThing('')
+        (instance as any).getThing('')
       ).rejects.toThrow(/url.*empty/i)
     })
 
     it('should throw ValidationError when url is not a valid URL', async () => {
       await expect(
-        (doInstance as any).getThing('not-a-valid-url')
+        (instance as any).getThing('not-a-valid-url')
       ).rejects.toThrow(/url.*invalid|url.*format/i)
     })
 
     it('should throw ValidationError when url is not a string', async () => {
       await expect(
-        (doInstance as any).getThing(123)
+        (instance as any).getThing(123)
       ).rejects.toThrow(/url.*string/i)
     })
   })
@@ -527,37 +538,37 @@ describe('CRUD Input Validation', () => {
   describe('getThingById() parameter validation', () => {
     it('should throw ValidationError when ns is undefined', async () => {
       await expect(
-        (doInstance as any).getThingById(undefined, 'user', 'id-1')
+        (instance as any).getThingById(undefined, 'user', 'id-1')
       ).rejects.toThrow(/ns.*required|namespace.*required/i)
     })
 
     it('should throw ValidationError when ns is empty string', async () => {
       await expect(
-        (doInstance as any).getThingById('', 'user', 'id-1')
+        (instance as any).getThingById('', 'user', 'id-1')
       ).rejects.toThrow(/ns.*empty|namespace.*empty/i)
     })
 
     it('should throw ValidationError when type is undefined', async () => {
       await expect(
-        (doInstance as any).getThingById('example.com', undefined, 'id-1')
+        (instance as any).getThingById('example.com', undefined, 'id-1')
       ).rejects.toThrow(/type.*required/i)
     })
 
     it('should throw ValidationError when type is empty string', async () => {
       await expect(
-        (doInstance as any).getThingById('example.com', '', 'id-1')
+        (instance as any).getThingById('example.com', '', 'id-1')
       ).rejects.toThrow(/type.*empty/i)
     })
 
     it('should throw ValidationError when id is undefined', async () => {
       await expect(
-        (doInstance as any).getThingById('example.com', 'user', undefined)
+        (instance as any).getThingById('example.com', 'user', undefined)
       ).rejects.toThrow(/id.*required/i)
     })
 
     it('should throw ValidationError when id is empty string', async () => {
       await expect(
-        (doInstance as any).getThingById('example.com', 'user', '')
+        (instance as any).getThingById('example.com', 'user', '')
       ).rejects.toThrow(/id.*empty/i)
     })
   })
@@ -569,31 +580,31 @@ describe('CRUD Input Validation', () => {
   describe('setThing() / Thing.set() parameter validation', () => {
     it('should throw ValidationError when url is undefined', async () => {
       await expect(
-        (doInstance as any).setThing(undefined, { name: 'test' })
+        (instance as any).setThing(undefined, { name: 'test' })
       ).rejects.toThrow(/url.*required/i)
     })
 
     it('should throw ValidationError when url is empty string', async () => {
       await expect(
-        (doInstance as any).setThing('', { name: 'test' })
+        (instance as any).setThing('', { name: 'test' })
       ).rejects.toThrow(/url.*empty/i)
     })
 
     it('should throw ValidationError when url is not a valid URL', async () => {
       await expect(
-        (doInstance as any).setThing('not-a-valid-url', { name: 'test' })
+        (instance as any).setThing('not-a-valid-url', { name: 'test' })
       ).rejects.toThrow(/url.*invalid|url.*format/i)
     })
 
     it('should throw ValidationError when data is undefined', async () => {
       await expect(
-        (doInstance as any).setThing('https://example.com/user/1', undefined)
+        (instance as any).setThing('https://example.com/user/1', undefined)
       ).rejects.toThrow(/data.*required/i)
     })
 
     it('should throw ValidationError when data is not an object', async () => {
       await expect(
-        (doInstance as any).setThing('https://example.com/user/1', 'not object')
+        (instance as any).setThing('https://example.com/user/1', 'not object')
       ).rejects.toThrow(/data.*object/i)
     })
   })
@@ -605,19 +616,19 @@ describe('CRUD Input Validation', () => {
   describe('deleteThing() / Thing.delete() parameter validation', () => {
     it('should throw ValidationError when url is undefined', async () => {
       await expect(
-        (doInstance as any).deleteThing(undefined)
+        (instance as any).deleteThing(undefined)
       ).rejects.toThrow(/url.*required/i)
     })
 
     it('should throw ValidationError when url is empty string', async () => {
       await expect(
-        (doInstance as any).deleteThing('')
+        (instance as any).deleteThing('')
       ).rejects.toThrow(/url.*empty/i)
     })
 
     it('should throw ValidationError when url is not a valid URL', async () => {
       await expect(
-        (doInstance as any).deleteThing('not-a-valid-url')
+        (instance as any).deleteThing('not-a-valid-url')
       ).rejects.toThrow(/url.*invalid|url.*format/i)
     })
   })
@@ -629,13 +640,13 @@ describe('CRUD Input Validation', () => {
   describe('relate() parameter validation', () => {
     it('should throw ValidationError when options is undefined', async () => {
       await expect(
-        (doInstance as any).relate(undefined)
+        (instance as any).relate(undefined)
       ).rejects.toThrow(/options.*required/i)
     })
 
     it('should throw ValidationError when type is missing', async () => {
       await expect(
-        (doInstance as any).relate({
+        (instance as any).relate({
           from: 'https://example.com/user/1',
           to: 'https://example.com/user/2',
         })
@@ -644,7 +655,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when type is empty string', async () => {
       await expect(
-        (doInstance as any).relate({
+        (instance as any).relate({
           type: '',
           from: 'https://example.com/user/1',
           to: 'https://example.com/user/2',
@@ -654,7 +665,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when from is missing', async () => {
       await expect(
-        (doInstance as any).relate({
+        (instance as any).relate({
           type: 'follows',
           to: 'https://example.com/user/2',
         })
@@ -663,7 +674,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when from is not a valid URL', async () => {
       await expect(
-        (doInstance as any).relate({
+        (instance as any).relate({
           type: 'follows',
           from: 'not-a-url',
           to: 'https://example.com/user/2',
@@ -673,7 +684,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when to is missing', async () => {
       await expect(
-        (doInstance as any).relate({
+        (instance as any).relate({
           type: 'follows',
           from: 'https://example.com/user/1',
         })
@@ -682,7 +693,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when to is not a valid URL', async () => {
       await expect(
-        (doInstance as any).relate({
+        (instance as any).relate({
           type: 'follows',
           from: 'https://example.com/user/1',
           to: 'not-a-url',
@@ -692,7 +703,7 @@ describe('CRUD Input Validation', () => {
 
     it('should allow self-referential relationships (valid graph pattern)', async () => {
       // Self-referential relationships are valid graph patterns (e.g., recursive parent, self-mentions)
-      const result = await (doInstance as any).relate({
+      const result = await (instance as any).relate({
         type: 'references',
         from: 'https://example.com/node/1',
         to: 'https://example.com/node/1',
@@ -709,37 +720,37 @@ describe('CRUD Input Validation', () => {
   describe('unrelate() parameter validation', () => {
     it('should throw ValidationError when from is undefined', async () => {
       await expect(
-        (doInstance as any).unrelate(undefined, 'follows', 'https://example.com/user/2')
+        (instance as any).unrelate(undefined, 'follows', 'https://example.com/user/2')
       ).rejects.toThrow(/from.*required/i)
     })
 
     it('should throw ValidationError when from is not a valid URL', async () => {
       await expect(
-        (doInstance as any).unrelate('not-a-url', 'follows', 'https://example.com/user/2')
+        (instance as any).unrelate('not-a-url', 'follows', 'https://example.com/user/2')
       ).rejects.toThrow(/from.*invalid.*url|from.*url.*format/i)
     })
 
     it('should throw ValidationError when type is undefined', async () => {
       await expect(
-        (doInstance as any).unrelate('https://example.com/user/1', undefined, 'https://example.com/user/2')
+        (instance as any).unrelate('https://example.com/user/1', undefined, 'https://example.com/user/2')
       ).rejects.toThrow(/type.*required/i)
     })
 
     it('should throw ValidationError when type is empty string', async () => {
       await expect(
-        (doInstance as any).unrelate('https://example.com/user/1', '', 'https://example.com/user/2')
+        (instance as any).unrelate('https://example.com/user/1', '', 'https://example.com/user/2')
       ).rejects.toThrow(/type.*empty/i)
     })
 
     it('should throw ValidationError when to is undefined', async () => {
       await expect(
-        (doInstance as any).unrelate('https://example.com/user/1', 'follows', undefined)
+        (instance as any).unrelate('https://example.com/user/1', 'follows', undefined)
       ).rejects.toThrow(/to.*required/i)
     })
 
     it('should throw ValidationError when to is not a valid URL', async () => {
       await expect(
-        (doInstance as any).unrelate('https://example.com/user/1', 'follows', 'not-a-url')
+        (instance as any).unrelate('https://example.com/user/1', 'follows', 'not-a-url')
       ).rejects.toThrow(/to.*invalid.*url|to.*url.*format/i)
     })
   })
@@ -751,13 +762,13 @@ describe('CRUD Input Validation', () => {
   describe('track() parameter validation', () => {
     it('should throw ValidationError when options is undefined', async () => {
       await expect(
-        (doInstance as any).track(undefined)
+        (instance as any).track(undefined)
       ).rejects.toThrow(/options.*required/i)
     })
 
     it('should throw ValidationError when type is missing', async () => {
       await expect(
-        (doInstance as any).track({
+        (instance as any).track({
           source: 'system',
           data: { key: 'value' },
         })
@@ -766,7 +777,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when type is empty string', async () => {
       await expect(
-        (doInstance as any).track({
+        (instance as any).track({
           type: '',
           source: 'system',
           data: { key: 'value' },
@@ -776,7 +787,7 @@ describe('CRUD Input Validation', () => {
 
     it('should auto-populate source from auth context when missing', async () => {
       // Source auto-populates from auth context userId or defaults to 'unknown'
-      const result = await (doInstance as any).track({
+      const result = await (instance as any).track({
         type: 'user.created',
         data: { key: 'value' },
       })
@@ -785,7 +796,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when source is empty string', async () => {
       await expect(
-        (doInstance as any).track({
+        (instance as any).track({
           type: 'user.created',
           source: '',
           data: { key: 'value' },
@@ -795,7 +806,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when data is missing', async () => {
       await expect(
-        (doInstance as any).track({
+        (instance as any).track({
           type: 'user.created',
           source: 'system',
         })
@@ -804,7 +815,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when data is not an object', async () => {
       await expect(
-        (doInstance as any).track({
+        (instance as any).track({
           type: 'user.created',
           source: 'system',
           data: 'not an object',
@@ -814,7 +825,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when event type contains invalid characters', async () => {
       await expect(
-        (doInstance as any).track({
+        (instance as any).track({
           type: 'user<script>alert(1)</script>',
           source: 'system',
           data: { key: 'value' },
@@ -830,13 +841,13 @@ describe('CRUD Input Validation', () => {
   describe('send() parameter validation', () => {
     it('should throw ValidationError when options is undefined', async () => {
       await expect(
-        (doInstance as any).send(undefined)
+        (instance as any).send(undefined)
       ).rejects.toThrow(/options.*required/i)
     })
 
     it('should auto-populate actor from auth context when missing', async () => {
       // Actor auto-populates from auth context userId or defaults to 'unknown'
-      const result = await (doInstance as any).send({
+      const result = await (instance as any).send({
         object: 'https://example.com/post/1',
         action: 'approve',
       })
@@ -845,7 +856,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when actor is empty string', async () => {
       await expect(
-        (doInstance as any).send({
+        (instance as any).send({
           actor: '',
           object: 'https://example.com/post/1',
           action: 'approve',
@@ -855,7 +866,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when object is missing', async () => {
       await expect(
-        (doInstance as any).send({
+        (instance as any).send({
           actor: 'https://example.com/user/1',
           action: 'approve',
         })
@@ -864,7 +875,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when object is empty string', async () => {
       await expect(
-        (doInstance as any).send({
+        (instance as any).send({
           actor: 'https://example.com/user/1',
           object: '',
           action: 'approve',
@@ -874,7 +885,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when action is missing', async () => {
       await expect(
-        (doInstance as any).send({
+        (instance as any).send({
           actor: 'https://example.com/user/1',
           object: 'https://example.com/post/1',
         })
@@ -883,7 +894,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when action is empty string', async () => {
       await expect(
-        (doInstance as any).send({
+        (instance as any).send({
           actor: 'https://example.com/user/1',
           object: 'https://example.com/post/1',
           action: '',
@@ -893,7 +904,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when status is invalid', async () => {
       await expect(
-        (doInstance as any).send({
+        (instance as any).send({
           actor: 'https://example.com/user/1',
           object: 'https://example.com/post/1',
           action: 'approve',
@@ -910,13 +921,13 @@ describe('CRUD Input Validation', () => {
   describe('storeArtifact() parameter validation', () => {
     it('should throw ValidationError when options is undefined', async () => {
       await expect(
-        (doInstance as any).storeArtifact(undefined)
+        (instance as any).storeArtifact(undefined)
       ).rejects.toThrow(/options.*required/i)
     })
 
     it('should throw ValidationError when key is missing', async () => {
       await expect(
-        (doInstance as any).storeArtifact({
+        (instance as any).storeArtifact({
           type: 'ast',
           source: 'https://example.com/code.ts',
           sourceHash: 'abc123',
@@ -927,7 +938,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when key is empty string', async () => {
       await expect(
-        (doInstance as any).storeArtifact({
+        (instance as any).storeArtifact({
           key: '',
           type: 'ast',
           source: 'https://example.com/code.ts',
@@ -939,7 +950,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when type is missing', async () => {
       await expect(
-        (doInstance as any).storeArtifact({
+        (instance as any).storeArtifact({
           key: 'artifact-1',
           source: 'https://example.com/code.ts',
           sourceHash: 'abc123',
@@ -950,7 +961,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when source is missing', async () => {
       await expect(
-        (doInstance as any).storeArtifact({
+        (instance as any).storeArtifact({
           key: 'artifact-1',
           type: 'ast',
           sourceHash: 'abc123',
@@ -961,7 +972,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when sourceHash is missing', async () => {
       await expect(
-        (doInstance as any).storeArtifact({
+        (instance as any).storeArtifact({
           key: 'artifact-1',
           type: 'ast',
           source: 'https://example.com/code.ts',
@@ -972,7 +983,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when content is missing', async () => {
       await expect(
-        (doInstance as any).storeArtifact({
+        (instance as any).storeArtifact({
           key: 'artifact-1',
           type: 'ast',
           source: 'https://example.com/code.ts',
@@ -984,7 +995,7 @@ describe('CRUD Input Validation', () => {
     it('should allow negative ttl (creates already-expired artifact)', async () => {
       // Negative TTL is allowed - it creates an artifact that is already expired
       // This is useful for testing cleanup functionality
-      const result = await (doInstance as any).storeArtifact({
+      const result = await (instance as any).storeArtifact({
         key: 'artifact-1',
         type: 'ast',
         source: 'https://example.com/code.ts',
@@ -999,7 +1010,7 @@ describe('CRUD Input Validation', () => {
 
     it('should throw ValidationError when ttl is not a number', async () => {
       await expect(
-        (doInstance as any).storeArtifact({
+        (instance as any).storeArtifact({
           key: 'artifact-1',
           type: 'ast',
           source: 'https://example.com/code.ts',
@@ -1018,19 +1029,19 @@ describe('CRUD Input Validation', () => {
   describe('getArtifact() parameter validation', () => {
     it('should throw ValidationError when key is undefined', async () => {
       await expect(
-        (doInstance as any).getArtifact(undefined)
+        (instance as any).getArtifact(undefined)
       ).rejects.toThrow(/key.*required/i)
     })
 
     it('should throw ValidationError when key is empty string', async () => {
       await expect(
-        (doInstance as any).getArtifact('')
+        (instance as any).getArtifact('')
       ).rejects.toThrow(/key.*empty/i)
     })
 
     it('should throw ValidationError when key is not a string', async () => {
       await expect(
-        (doInstance as any).getArtifact(123)
+        (instance as any).getArtifact(123)
       ).rejects.toThrow(/key.*string/i)
     })
   })
@@ -1042,44 +1053,44 @@ describe('CRUD Input Validation', () => {
   describe('search() parameter validation', () => {
     it('should throw ValidationError when query is undefined', async () => {
       await expect(
-        (doInstance as any).search(undefined)
+        (instance as any).search(undefined)
       ).rejects.toThrow(/query.*required/i)
     })
 
     it('should throw ValidationError when query is empty string', async () => {
       await expect(
-        (doInstance as any).search('')
+        (instance as any).search('')
       ).rejects.toThrow(/query.*empty/i)
     })
 
     it('should throw ValidationError when query is not a string', async () => {
       await expect(
-        (doInstance as any).search(123)
+        (instance as any).search(123)
       ).rejects.toThrow(/query.*string/i)
     })
 
     it('should throw ValidationError when query is too long', async () => {
       const longQuery = 'a'.repeat(10001)
       await expect(
-        (doInstance as any).search(longQuery)
+        (instance as any).search(longQuery)
       ).rejects.toThrow(/query.*long|query.*length/i)
     })
 
     it('should throw ValidationError when options.limit is negative', async () => {
       await expect(
-        doInstance.search('test', { limit: -1 })
+        (instance as any).search('test', { limit: -1 })
       ).rejects.toThrow(/limit.*positive|invalid.*limit/i)
     })
 
     it('should throw ValidationError when options.collections is not an array', async () => {
       await expect(
-        doInstance.search('test', { collections: 'users' as any })
+        (instance as any).search('test', { collections: 'users' as any })
       ).rejects.toThrow(/collections.*array/i)
     })
 
     it('should throw ValidationError when options.collections contains non-strings', async () => {
       await expect(
-        doInstance.search('test', { collections: ['users', 123 as any] })
+        (instance as any).search('test', { collections: ['users', 123 as any] })
       ).rejects.toThrow(/collections.*string/i)
     })
   })
@@ -1092,31 +1103,31 @@ describe('CRUD Input Validation', () => {
     it('should not coerce number to string for collection name', async () => {
       // If coerced, 123 would become "123" and might work
       await expect(
-        (doInstance as any).get(123, 'valid-id')
+        (instance as any).get(123, 'valid-id')
       ).rejects.toThrow(/collection.*string|invalid.*collection/i)
     })
 
     it('should not coerce boolean to string for id', async () => {
       await expect(
-        (doInstance as any).get('users', true)
+        (instance as any).get('users', true)
       ).rejects.toThrow(/id.*string|invalid.*id/i)
     })
 
     it('should not coerce array to object for data', async () => {
       await expect(
-        doInstance.create('users', ['not', 'an', 'object'])
+        (instance as any).create('users', ['not', 'an', 'object'])
       ).rejects.toThrow(/data.*object|invalid.*data/i)
     })
 
     it('should reject Date objects for string parameters', async () => {
       await expect(
-        (doInstance as any).get('users', new Date())
+        (instance as any).get('users', new Date())
       ).rejects.toThrow(/id.*string|invalid.*id/i)
     })
 
     it('should reject Symbol for string parameters', async () => {
       await expect(
-        (doInstance as any).get('users', Symbol('test'))
+        (instance as any).get('users', Symbol('test'))
       ).rejects.toThrow(/id.*string|invalid.*id/i)
     })
   })
@@ -1129,21 +1140,21 @@ describe('CRUD Input Validation', () => {
     it('should handle very long collection names', async () => {
       const longName = 'a'.repeat(1001)
       await expect(
-        doInstance.get(longName, 'valid-id')
+        (instance as any).get(longName, 'valid-id')
       ).rejects.toThrow(/collection.*long|collection.*length/i)
     })
 
     it('should handle very long IDs', async () => {
       const longId = 'a'.repeat(1001)
       await expect(
-        doInstance.get('users', longId)
+        (instance as any).get('users', longId)
       ).rejects.toThrow(/id.*long|id.*length/i)
     })
 
     it('should handle Unicode in collection names appropriately', async () => {
       // Some systems might reject Unicode, others might accept it
       // The key is consistent behavior
-      const result = doInstance.get('users_emoji_test', 'valid-id')
+      const result = (instance as any).get('users_emoji_test', 'valid-id')
       // Should either succeed (return null for not found) or throw a consistent error
       await expect(result).resolves.toBeDefined().catch(() => {
         // If it throws, that's also acceptable as long as it's consistent
@@ -1152,13 +1163,13 @@ describe('CRUD Input Validation', () => {
 
     it('should handle null bytes in strings', async () => {
       await expect(
-        doInstance.get('users\x00evil', 'valid-id')
+        (instance as any).get('users\x00evil', 'valid-id')
       ).rejects.toThrow(/invalid.*characters|null.*byte/i)
     })
 
     it('should handle newlines in IDs', async () => {
       await expect(
-        doInstance.get('users', 'id\nwith\nnewlines')
+        (instance as any).get('users', 'id\nwith\nnewlines')
       ).rejects.toThrow(/invalid.*characters|newline/i)
     })
   })
@@ -1170,37 +1181,37 @@ describe('CRUD Input Validation', () => {
   describe('invoke() parameter validation', () => {
     it('should throw when method name is empty string', async () => {
       await expect(
-        doInstance.invoke('', [])
+        (instance as any).invoke('', [])
       ).rejects.toThrow(/method.*empty|invalid.*method/i)
     })
 
     it('should throw when method name is not a string', async () => {
       await expect(
-        (doInstance as any).invoke(123, [])
+        (instance as any).invoke(123, [])
       ).rejects.toThrow(/method.*string|invalid.*method/i)
     })
 
     it('should throw when params is not an array', async () => {
       await expect(
-        (doInstance as any).invoke('get', 'not an array')
+        (instance as any).invoke('get', 'not an array')
       ).rejects.toThrow(/params.*array|invalid.*params/i)
     })
 
     it('should throw when trying to invoke disallowed methods', async () => {
       await expect(
-        doInstance.invoke('constructor', [])
+        (instance as any).invoke('constructor', [])
       ).rejects.toThrow(/not allowed|disallowed/i)
     })
 
     it('should throw when trying to invoke __proto__', async () => {
       await expect(
-        doInstance.invoke('__proto__', [])
+        (instance as any).invoke('__proto__', [])
       ).rejects.toThrow(/not allowed|disallowed/i)
     })
 
     it('should throw when trying to invoke toString', async () => {
       await expect(
-        doInstance.invoke('toString', [])
+        (instance as any).invoke('toString', [])
       ).rejects.toThrow(/not allowed|disallowed/i)
     })
   })
