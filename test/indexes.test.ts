@@ -1,3 +1,17 @@
+import { vi } from 'vitest'
+
+vi.mock('cloudflare:workers', () => {
+  class MockDurableObject<Env = unknown> {
+    protected ctx: unknown
+    protected env: Env
+    constructor(ctx: unknown, env: Env) {
+      this.ctx = ctx
+      this.env = env
+    }
+  }
+  return { DurableObject: MockDurableObject }
+})
+
 /**
  * @dotdo/do - Database Indexes Tests (RED Phase)
  *
@@ -9,7 +23,7 @@
  * They should FAIL initially (RED), then pass after implementation (GREEN).
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { DO } from '../src/do'
 
 /**

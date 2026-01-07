@@ -1,3 +1,17 @@
+import { vi } from 'vitest'
+
+vi.mock('cloudflare:workers', () => {
+  class MockDurableObject<Env = unknown> {
+    protected ctx: unknown
+    protected env: Env
+    constructor(ctx: unknown, env: Env) {
+      this.ctx = ctx
+      this.env = env
+    }
+  }
+  return { DurableObject: MockDurableObject }
+})
+
 /**
  * @dotdo/do - WebSocket Handler Tests
  *
@@ -6,7 +20,7 @@
  * - webSocketClose: Connection cleanup and subscriber notification
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { DO } from '../src/do'
 
 // Mock WebSocket class

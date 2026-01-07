@@ -127,6 +127,7 @@ import type {
   ScheduleInterval,
   EventHandler,
   ScheduleHandler,
+  AuthContext,
 } from './types'
 
 // Placeholder types until we can import from agents package
@@ -159,7 +160,24 @@ type DurableObjectState = {
 interface ConnectionInfo {
   id: string
   subscriptions: Set<string>
+  metadata: Record<string, unknown>
 }
+
+/**
+ * Event data emitted on connection close
+ */
+interface ConnectionCloseEvent {
+  ws: WebSocket
+  code: number
+  reason: string
+  wasClean: boolean
+  metadata: Record<string, unknown>
+}
+
+/**
+ * Event handler type for connection events
+ */
+type ConnectionEventHandler = (event: ConnectionCloseEvent) => void
 
 export class DO<Env = unknown> extends DurableObject<Env> {
   // ctx and env are provided by DurableObject base class
@@ -170,10 +188,18 @@ export class DO<Env = unknown> extends DurableObject<Env> {
   // Workflow schedules stored in memory (registered via registerSchedule)
   private workflowSchedules: Array<{ interval: ScheduleInterval; handler: ScheduleHandler }> = []
 
-  // WebSocket connection tracking
-  private connections: Map<WebSocket, ConnectionInfo> = new Map()
+  // WebSocket connection tracking (public for access by tests and subclasses)
+  connections: Map<WebSocket, ConnectionInfo> = new Map()
   // Topic -> Set of subscribed WebSockets
   private subscribers: Map<string, Set<WebSocket>> = new Map()
+
+  // Auth context for the current request
+  private currentAuthContext: AuthContext | null = null
+  // WebSocket auth contexts (per-connection)
+  private wsAuthContexts: Map<WebSocket, AuthContext> = new Map()
+
+  // Event handlers for connection events
+  private eventHandlers: Map<string, Set<ConnectionEventHandler>> = new Map()
 
   /**
    * Allowlist of methods that can be invoked via RPC.
@@ -415,22 +441,210 @@ export class DO<Env = unknown> extends DurableObject<Env> {
   }
 
   /**
-   * Invoke a method by name
+   * Invoke a method by name with optional auth context
    */
-  async invoke(method: string, params: unknown[]): Promise<unknown> {
+  async invoke(method: string, params: unknown[], authContext?: AuthContext): Promise<unknown> {
     if (!this.allowedMethods.has(method)) {
       throw new Error(`Method not allowed: ${method}`)
     }
 
-    // Use indexed access on the class prototype chain
-    // Safe because we've verified the method is in our allowedMethods set
-    const target = this as Record<string, unknown>
-    const fn = target[method]
-    if (typeof fn !== 'function') {
-      throw new Error(`Method not found: ${method}`)
+    // Set auth context for this invocation
+    const previousAuth = this.currentAuthContext
+    if (authContext !== undefined) {
+      this.currentAuthContext = authContext
     }
 
-    return fn.apply(this, params)
+    try {
+      // Use indexed access on the class prototype chain
+      // Safe because we've verified the method is in our allowedMethods set
+      const target = this as Record<string, unknown>
+      const fn = target[method]
+      if (typeof fn !== 'function') {
+        throw new Error(`Method not found: ${method}`)
+      }
+
+      return await fn.apply(this, params)
+    } finally {
+      // Restore previous auth context
+      this.currentAuthContext = previousAuth
+    }
+  }
+
+  // ============================================
+  // Auth Context Methods
+  // ============================================
+
+  /**
+   * Get the current auth context
+   */
+  getAuthContext(): AuthContext | null {
+    return this.currentAuthContext
+  }
+
+  /**
+   * Set the auth context for the current request
+   */
+  setAuthContext(authContext: AuthContext | null): void {
+    this.currentAuthContext = authContext
+  }
+
+  /**
+   * Check if the current user has a specific permission
+   */
+  checkPermission(permission: string): boolean {
+    if (!this.currentAuthContext) {
+      return false
+    }
+    if (!this.currentAuthContext.permissions || this.currentAuthContext.permissions.length === 0) {
+      return false
+    }
+    return this.currentAuthContext.permissions.includes(permission)
+  }
+
+  /**
+   * Require a specific permission, throwing if not present
+   */
+  requirePermission(permission: string): void {
+    if (!this.currentAuthContext) {
+      throw new Error('Authentication required')
+    }
+    if (!this.checkPermission(permission)) {
+      throw new Error('Permission denied')
+    }
+  }
+
+  /**
+   * Get a metadata value from the auth context
+   */
+  getAuthMetadata(key: string): unknown {
+    if (!this.currentAuthContext?.metadata) {
+      return undefined
+    }
+    return this.currentAuthContext.metadata[key]
+  }
+
+  /**
+   * Get the WebSocket auth context for a specific connection
+   */
+  getWebSocketAuth(ws?: WebSocket): AuthContext | undefined {
+    if (!ws) {
+      // Return the current auth context if no ws specified
+      return this.currentAuthContext ?? undefined
+    }
+    return this.wsAuthContexts.get(ws)
+  }
+
+  /**
+   * Set the WebSocket auth context for a specific connection
+   */
+  setWebSocketAuth(ws: WebSocket, authContext: AuthContext): void {
+    this.wsAuthContexts.set(ws, authContext)
+  }
+
+  /**
+   * Create a scoped proxy with fixed auth context
+   */
+  withAuth(authContext: AuthContext): DO<Env> {
+    // Create a proxy that wraps this instance with a fixed auth context
+    const self = this
+    return new Proxy(this, {
+      get(target, prop, receiver) {
+        // Override getAuthContext to return the fixed auth context
+        if (prop === 'getAuthContext') {
+          return () => authContext
+        }
+        // For methods that need auth context, wrap them
+        const value = Reflect.get(target, prop, receiver)
+        if (typeof value === 'function' && prop !== 'constructor') {
+          return async function (...args: unknown[]) {
+            const previousAuth = self.currentAuthContext
+            self.currentAuthContext = authContext
+            try {
+              return await value.apply(target, args)
+            } finally {
+              self.currentAuthContext = previousAuth
+            }
+          }
+        }
+        return value
+      },
+    }) as DO<Env>
+  }
+
+  /**
+   * Extract auth context from HTTP request headers
+   */
+  private extractAuthFromRequest(request: Request): AuthContext | null {
+    const authContext: AuthContext = {}
+
+    // Check for X-Auth-Context header (full auth context as JSON)
+    const xAuthContext = request.headers.get('X-Auth-Context')
+    if (xAuthContext) {
+      try {
+        const parsed = JSON.parse(xAuthContext)
+        return parsed as AuthContext
+      } catch {
+        // Invalid JSON, continue with other headers
+      }
+    }
+
+    // Extract Authorization header (Bearer token)
+    const authHeader = request.headers.get('Authorization')
+    if (authHeader?.startsWith('Bearer ')) {
+      authContext.token = authHeader.substring(7)
+    }
+
+    // Extract custom headers
+    const userId = request.headers.get('X-User-ID')
+    if (userId) {
+      authContext.userId = userId
+    }
+
+    const orgId = request.headers.get('X-Organization-ID')
+    if (orgId) {
+      authContext.organizationId = orgId
+    }
+
+    const permissions = request.headers.get('X-Permissions')
+    if (permissions) {
+      authContext.permissions = permissions.split(',').map(p => p.trim())
+    }
+
+    // Return null if no auth info was found
+    if (Object.keys(authContext).length === 0) {
+      return null
+    }
+
+    return authContext
+  }
+
+  /**
+   * Extract auth from WebSocket upgrade request query params
+   */
+  private extractAuthFromUrl(url: URL): AuthContext | null {
+    const authContext: AuthContext = {}
+
+    const token = url.searchParams.get('token')
+    if (token) {
+      authContext.token = token
+    }
+
+    const userId = url.searchParams.get('userId')
+    if (userId) {
+      authContext.userId = userId
+    }
+
+    const orgId = url.searchParams.get('organizationId')
+    if (orgId) {
+      authContext.organizationId = orgId
+    }
+
+    // Return null if no auth info was found
+    if (Object.keys(authContext).length === 0) {
+      return null
+    }
+
+    return authContext
   }
 
   // ============================================
@@ -2678,12 +2892,53 @@ export class DO<Env = unknown> extends DurableObject<Env> {
       return
     }
 
+    // Check for auth message type
+    const anyParsed = parsed as Record<string, unknown>
+    if (anyParsed.type === 'auth') {
+      // Handle authentication message
+      const authContext: AuthContext = {}
+      if (typeof anyParsed.token === 'string') authContext.token = anyParsed.token
+      if (typeof anyParsed.userId === 'string') authContext.userId = anyParsed.userId
+      if (typeof anyParsed.organizationId === 'string') authContext.organizationId = anyParsed.organizationId
+      if (Array.isArray(anyParsed.permissions)) authContext.permissions = anyParsed.permissions as string[]
+      if (typeof anyParsed.metadata === 'object' && anyParsed.metadata !== null) {
+        authContext.metadata = anyParsed.metadata as Record<string, unknown>
+      }
+      this.wsAuthContexts.set(ws, authContext)
+      return
+    }
+
     // Validate JSON-RPC structure
     const request = parsed as {
       jsonrpc?: string
       id?: string | number | null
       method?: string
       params?: unknown[]
+      type?: string
+    }
+
+    // Handle RPC message type (alternative to JSON-RPC)
+    if (request.type === 'rpc' && request.method) {
+      // Set auth context from WebSocket connection
+      const wsAuth = this.wsAuthContexts.get(ws)
+      if (wsAuth) {
+        this.currentAuthContext = wsAuth
+      }
+
+      try {
+        const params = Array.isArray(request.params) ? request.params : []
+        const result = await this.invoke(request.method, params)
+        ws.send(JSON.stringify({ type: 'rpc', id: request.id, result }))
+      } catch (err) {
+        ws.send(JSON.stringify({
+          type: 'rpc',
+          id: request.id,
+          error: err instanceof Error ? err.message : 'Unknown error'
+        }))
+      } finally {
+        this.currentAuthContext = null
+      }
+      return
     }
 
     // Check for required method field
@@ -2706,6 +2961,12 @@ export class DO<Env = unknown> extends DurableObject<Env> {
     // Get params (default to empty array)
     const params = Array.isArray(request.params) ? request.params : []
 
+    // Set auth context from WebSocket connection before executing
+    const wsAuth = this.wsAuthContexts.get(ws)
+    if (wsAuth) {
+      this.currentAuthContext = wsAuth
+    }
+
     // Execute the method
     try {
       const result = await this.invoke(request.method, params)
@@ -2724,6 +2985,9 @@ export class DO<Env = unknown> extends DurableObject<Env> {
         const errMessage = error instanceof Error ? error.message : 'Unknown error'
         sendError(request.id, -32000, errMessage)
       }
+    } finally {
+      // Clear auth context after request completes
+      this.currentAuthContext = null
     }
   }
 
@@ -2733,12 +2997,25 @@ export class DO<Env = unknown> extends DurableObject<Env> {
    */
   async webSocketClose(
     ws: WebSocket,
-    _code: number,
-    _reason: string,
-    _wasClean: boolean
+    code: number,
+    reason: string,
+    wasClean: boolean
   ): Promise<void> {
+    // Clean up WebSocket auth context
+    this.wsAuthContexts.delete(ws)
+
     // Get connection info before removing
     const connectionInfo = this.connections.get(ws)
+
+    // Emit connection:close event if there are handlers
+    const metadata = connectionInfo?.metadata ?? {}
+    this.emit('connection:close', {
+      ws,
+      code,
+      reason,
+      wasClean,
+      metadata,
+    })
 
     if (!connectionInfo) {
       // Connection was not tracked, nothing to clean up
@@ -2787,6 +3064,167 @@ export class DO<Env = unknown> extends DurableObject<Env> {
    */
   async webSocketError(_ws: WebSocket, error: unknown): Promise<void> {
     console.error('WebSocket error:', error)
+  }
+
+  // ============================================
+  // Connection Management API
+  // ============================================
+
+  /**
+   * Register a WebSocket connection with optional metadata
+   * @param ws The WebSocket to register
+   * @param metadata Optional metadata to associate with the connection
+   */
+  async registerConnection(ws: WebSocket, metadata: Record<string, unknown> = {}): Promise<void> {
+    const id = crypto.randomUUID()
+    this.connections.set(ws, {
+      id,
+      subscriptions: new Set(),
+      metadata,
+    })
+  }
+
+  /**
+   * Get metadata associated with a WebSocket connection
+   * @param ws The WebSocket to get metadata for
+   * @returns The metadata or undefined if not found
+   */
+  getConnectionMetadata(ws: WebSocket): Record<string, unknown> | undefined {
+    return this.connections.get(ws)?.metadata
+  }
+
+  /**
+   * Update metadata for an existing WebSocket connection
+   * @param ws The WebSocket to update
+   * @param metadata The metadata to merge with existing metadata
+   */
+  updateConnectionMetadata(ws: WebSocket, metadata: Record<string, unknown>): void {
+    const connectionInfo = this.connections.get(ws)
+    if (connectionInfo) {
+      connectionInfo.metadata = { ...connectionInfo.metadata, ...metadata }
+    }
+  }
+
+  /**
+   * Get all active WebSocket connections
+   * @returns Array of active WebSocket connections
+   */
+  getActiveConnections(): WebSocket[] {
+    return Array.from(this.connections.keys())
+  }
+
+  /**
+   * Get the count of active connections
+   * @returns Number of active connections
+   */
+  getConnectionCount(): number {
+    return this.connections.size
+  }
+
+  /**
+   * Find connections that match the given metadata filter
+   * @param filter Object with key-value pairs to match against connection metadata
+   * @returns Array of WebSocket connections matching the filter
+   */
+  findConnectionsByMetadata(filter: Record<string, unknown>): WebSocket[] {
+    const results: WebSocket[] = []
+    for (const [ws, info] of this.connections) {
+      let matches = true
+      for (const [key, value] of Object.entries(filter)) {
+        if (info.metadata[key] !== value) {
+          matches = false
+          break
+        }
+      }
+      if (matches) {
+        results.push(ws)
+      }
+    }
+    return results
+  }
+
+  /**
+   * Broadcast a message to all connections, optionally filtered by metadata
+   * @param message The message to broadcast
+   * @param filter Optional metadata filter to select which connections receive the message
+   */
+  broadcast(message: string, filter?: Record<string, unknown>): void {
+    const connections = filter
+      ? this.findConnectionsByMetadata(filter)
+      : this.getActiveConnections()
+
+    for (const ws of connections) {
+      try {
+        ws.send(message)
+      } catch {
+        // Connection may be closed, ignore errors
+      }
+    }
+  }
+
+  /**
+   * Close and clean up all active connections
+   */
+  async destroyAllConnections(): Promise<void> {
+    for (const ws of this.connections.keys()) {
+      try {
+        ws.close(1000, 'Connection destroyed')
+      } catch {
+        // Connection may already be closed
+      }
+    }
+    this.connections.clear()
+  }
+
+  // ============================================
+  // Event Emitter API
+  // ============================================
+
+  /**
+   * Register an event handler
+   * @param event The event name to listen for
+   * @param handler The handler function to call when the event is emitted
+   */
+  on(event: string, handler: ConnectionEventHandler): void {
+    let handlers = this.eventHandlers.get(event)
+    if (!handlers) {
+      handlers = new Set()
+      this.eventHandlers.set(event, handlers)
+    }
+    handlers.add(handler)
+  }
+
+  /**
+   * Remove an event handler
+   * @param event The event name
+   * @param handler The handler function to remove
+   */
+  off(event: string, handler: ConnectionEventHandler): void {
+    const handlers = this.eventHandlers.get(event)
+    if (handlers) {
+      handlers.delete(handler)
+      if (handlers.size === 0) {
+        this.eventHandlers.delete(event)
+      }
+    }
+  }
+
+  /**
+   * Emit an event to all registered handlers
+   * @param event The event name to emit
+   * @param data The event data to pass to handlers
+   */
+  private emit(event: string, data: ConnectionCloseEvent): void {
+    const handlers = this.eventHandlers.get(event)
+    if (handlers) {
+      for (const handler of handlers) {
+        try {
+          handler(data)
+        } catch {
+          // Ignore handler errors
+        }
+      }
+    }
   }
 
   // ============================================
@@ -3070,6 +3508,9 @@ function save() {
    * Handle incoming HTTP requests
    */
   async handleRequest(request: Request): Promise<Response> {
+    // Extract auth context from request headers
+    const authContext = this.extractAuthFromRequest(request)
+
     // Handle WebSocket upgrades first (works on any path)
     const upgradeHeader = request.headers.get('Upgrade')
     if (upgradeHeader?.toLowerCase() === 'websocket') {
@@ -3082,6 +3523,13 @@ function save() {
         this.ctx.acceptWebSocket(server)
       }
 
+      // Store WebSocket auth context from headers or URL params
+      const url = new URL(request.url)
+      const wsAuth = authContext ?? this.extractAuthFromUrl(url)
+      if (wsAuth) {
+        this.wsAuthContexts.set(server, wsAuth)
+      }
+
       // Return 101 Switching Protocols response with WebSocket
       return new Response(null, {
         status: 101,
@@ -3089,9 +3537,17 @@ function save() {
       })
     }
 
-    // Route HTTP requests through Hono
-    const router = this.createRouter()
-    return router.fetch(request)
+    // Set auth context for this request
+    this.currentAuthContext = authContext
+
+    try {
+      // Route HTTP requests through Hono
+      const router = this.createRouter()
+      return await router.fetch(request)
+    } finally {
+      // Clear auth context after request completes
+      this.currentAuthContext = null
+    }
   }
 
 }

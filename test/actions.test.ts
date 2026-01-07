@@ -11,7 +11,21 @@
  * These tests should FAIL initially (RED), then pass after implementation (GREEN).
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { vi } from 'vitest'
+
+vi.mock('cloudflare:workers', () => {
+  class MockDurableObject<Env = unknown> {
+    protected ctx: unknown
+    protected env: Env
+    constructor(ctx: unknown, env: Env) {
+      this.ctx = ctx
+      this.env = env
+    }
+  }
+  return { DurableObject: MockDurableObject }
+})
+
+import { describe, it, expect, beforeEach } from 'vitest'
 import { DO } from '../src/do'
 import type { Action, ActionStatus, CreateActionOptions } from '../src/types'
 

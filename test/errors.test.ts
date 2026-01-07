@@ -13,6 +13,20 @@
  * These tests should FAIL initially (RED) because the error classes don't exist yet.
  */
 
+import { vi } from 'vitest'
+
+vi.mock('cloudflare:workers', () => {
+  class MockDurableObject<Env = unknown> {
+    protected ctx: unknown
+    protected env: Env
+    constructor(ctx: unknown, env: Env) {
+      this.ctx = ctx
+      this.env = env
+    }
+  }
+  return { DurableObject: MockDurableObject }
+})
+
 import { describe, it, expect } from 'vitest'
 
 // These imports should fail initially - error classes don't exist yet

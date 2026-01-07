@@ -1,3 +1,17 @@
+import { vi } from 'vitest'
+
+vi.mock('cloudflare:workers', () => {
+  class MockDurableObject<Env = unknown> {
+    protected ctx: unknown
+    protected env: Env
+    constructor(ctx: unknown, env: Env) {
+      this.ctx = ctx
+      this.env = env
+    }
+  }
+  return { DurableObject: MockDurableObject }
+})
+
 /**
  * @dotdo/do - CDCPipeline Tests (RED Phase - Durable Execution)
  *
@@ -10,7 +24,7 @@
  * These tests should FAIL initially (RED) because the implementation doesn't exist yet.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { DO } from '../src/do'
 import type { Event, CreateEventOptions } from '../src/types'
 

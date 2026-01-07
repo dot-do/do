@@ -12,6 +12,26 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+
+// Mock cloudflare:workers to provide a testable DurableObject base class
+// This MUST be before importing DO since DO extends DurableObject
+vi.mock('cloudflare:workers', () => {
+  // Create a mock DurableObject class that doesn't validate constructor args
+  class MockDurableObject<Env = unknown> {
+    protected ctx: unknown
+    protected env: Env
+
+    constructor(ctx: unknown, env: Env) {
+      this.ctx = ctx
+      this.env = env
+    }
+  }
+
+  return {
+    DurableObject: MockDurableObject,
+  }
+})
+
 import { DO } from '../src/do'
 import { LRUCache, ObjectIndex } from '../src/storage'
 import type { ObjectLocation } from '../src/storage'

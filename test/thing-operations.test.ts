@@ -1,3 +1,17 @@
+import { vi } from 'vitest'
+
+vi.mock('cloudflare:workers', () => {
+  class MockDurableObject<Env = unknown> {
+    protected ctx: unknown
+    protected env: Env
+    constructor(ctx: unknown, env: Env) {
+      this.ctx = ctx
+      this.env = env
+    }
+  }
+  return { DurableObject: MockDurableObject }
+})
+
 /**
  * @dotdo/do - Thing Operations Tests (GREEN Phase - Phase 11 Graph Operations)
  *
@@ -8,7 +22,7 @@
  * providing graph database semantics for linked data.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { DO } from '../src/do'
 import type { Thing, CreateOptions, UpdateOptions, ListOptions } from '../src/types'
 

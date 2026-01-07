@@ -1,3 +1,17 @@
+import { vi } from 'vitest'
+
+vi.mock('cloudflare:workers', () => {
+  class MockDurableObject<Env = unknown> {
+    protected ctx: unknown
+    protected env: Env
+    constructor(ctx: unknown, env: Env) {
+      this.ctx = ctx
+      this.env = env
+    }
+  }
+  return { DurableObject: MockDurableObject }
+})
+
 /**
  * @dotdo/do - Graph Traversal API Tests (RED Phase)
  *
@@ -13,7 +27,7 @@
  * - Returns array of matched Things
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { DO } from '../../src/do'
 import type { Thing } from '../../src/types'
 

@@ -6,6 +6,9 @@
 
 import type { RpcRequest } from '../types'
 
+// Re-export JSON-RPC 2.0 implementation
+export * from './json-rpc'
+
 /** Method handler type for RPC methods */
 type RpcMethodHandler = (...args: unknown[]) => Promise<unknown>
 
