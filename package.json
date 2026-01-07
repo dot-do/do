@@ -28,6 +28,10 @@
     "./mcp": {
       "import": "./dist/mcp/index.js",
       "types": "./dist/mcp/index.d.ts"
+    },
+    "./agents": {
+      "import": "./dist/agents/index.js",
+      "types": "./dist/agents/index.d.ts"
     }
   },
   "scripts": {

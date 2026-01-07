@@ -6,6 +6,10 @@ node_modules/
 dist/
 *.tsbuildinfo
 
+# Generated declaration files in test directory
+test/**/*.d.ts
+test/**/*.d.ts.map
+
 # Environment
 .env
 .env.local

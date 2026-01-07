@@ -6,6 +6,7 @@ export default defineConfig({
     'types/index': 'src/types/index.ts',
     'rpc/index': 'src/rpc/index.ts',
     'mcp/index': 'src/mcp/index.ts',
+    'agents/index': 'src/agents/index.ts',
   },
   format: ['esm'],
   dts: true,
