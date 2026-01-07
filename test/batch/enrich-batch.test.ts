@@ -13,52 +13,15 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import {
+  enrichBatch,
+  type EnrichBatchOptions,
+  type EnrichProgress,
+  type EnrichResult,
+} from '../../src/batch/enrich'
 
-// Type definitions for enrichBatch
-interface EnrichBatchOptions<T, R> {
-  /** Maximum concurrent operations (default: 5) */
-  concurrency?: number
-  /** Progress callback called after each item completes */
-  onProgress?: (progress: EnrichProgress<T, R>) => void
-  /** Whether to continue on error or fail-fast (default: 'continue') */
-  errorHandling?: 'continue' | 'fail-fast'
-}
-
-interface EnrichProgress<T, R> {
-  /** Index of the completed item */
-  index: number
-  /** Total number of items */
-  total: number
-  /** The original item */
-  item: T
-  /** The enriched result (if successful) */
-  result?: R
-  /** The error (if failed) */
-  error?: Error
-  /** Whether this item succeeded */
-  success: boolean
-}
-
-interface EnrichResult<T, R> {
-  /** The original item */
-  item: T
-  /** The enriched result (if successful) */
-  result?: R
-  /** The error (if failed) */
-  error?: Error
-  /** Whether this item succeeded */
-  success: boolean
-}
-
-// Placeholder for the function to be implemented
-declare function enrichBatch<T, R>(
-  items: T[],
-  enrichFn: (item: T) => Promise<R>,
-  options?: EnrichBatchOptions<T, R>
-): Promise<EnrichResult<T, R>[]>
-
-describe('enrichBatch() (RED Phase)', () => {
-  describe.todo('Function Signature', () => {
+describe('enrichBatch()', () => {
+  describe('Function Signature', () => {
     it('should accept items array, enrichFn, and optional options', async () => {
       const items = ['a', 'b', 'c']
       const enrichFn = async (item: string) => item.toUpperCase()
@@ -91,7 +54,7 @@ describe('enrichBatch() (RED Phase)', () => {
     })
   })
 
-  describe.todo('Concurrency Limit', () => {
+  describe('Concurrency Limit', () => {
     it('should default to concurrency of 5', async () => {
       let maxConcurrent = 0
       let currentConcurrent = 0
@@ -166,7 +129,7 @@ describe('enrichBatch() (RED Phase)', () => {
     })
   })
 
-  describe.todo('Progress Callback', () => {
+  describe('Progress Callback', () => {
     it('should call onProgress after each item completes', async () => {
       const progressCalls: EnrichProgress<number, number>[] = []
       const items = [1, 2, 3]
@@ -249,7 +212,7 @@ describe('enrichBatch() (RED Phase)', () => {
     })
   })
 
-  describe.todo('Error Handling', () => {
+  describe('Error Handling', () => {
     describe('continue mode (default)', () => {
       it('should continue processing on error by default', async () => {
         const items = [1, 2, 3, 4]
@@ -332,7 +295,7 @@ describe('enrichBatch() (RED Phase)', () => {
     })
   })
 
-  describe.todo('Return Order', () => {
+  describe('Return Order', () => {
     it('should return results in original item order regardless of completion order', async () => {
       const items = [100, 50, 10, 200] // Different delays
 
@@ -390,7 +353,7 @@ describe('enrichBatch() (RED Phase)', () => {
     })
   })
 
-  describe.todo('Edge Cases', () => {
+  describe('Edge Cases', () => {
     it('should handle async enrichFn that returns immediately', async () => {
       const items = [1, 2, 3]
 
