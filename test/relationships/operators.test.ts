@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseOperator, splitChainedOperators, RelationshipDirection, RelationshipMode, OperatorParseError } from '../../src/relationships/operators'
+import { parseOperator, splitChainedOperators, RelationshipDirection, RelationshipMode } from '../../src/relationships/operators'
 
 describe('parseOperator', () => {
   describe('-> forward exact', () => {
@@ -102,15 +102,15 @@ describe('parseOperator', () => {
 
   describe('error handling', () => {
     it('throws OperatorParseError on invalid operator', () => {
-      expect(() => parseOperator('>>User')).toThrow(OperatorParseError)
+      expect(() => parseOperator('>>User')).toThrow(/Invalid operator format/)
     })
 
     it('throws on empty string', () => {
-      expect(() => parseOperator('')).toThrow(OperatorParseError)
+      expect(() => parseOperator('')).toThrow(/cannot be empty/)
     })
 
     it('throws on missing type', () => {
-      expect(() => parseOperator('->')).toThrow(OperatorParseError)
+      expect(() => parseOperator('->')).toThrow(/Invalid operator format/)
     })
 
     it('allows lowercase type names for relationship types', () => {
@@ -121,11 +121,11 @@ describe('parseOperator', () => {
     })
 
     it('throws on type starting with number', () => {
-      expect(() => parseOperator('->123User')).toThrow(OperatorParseError)
+      expect(() => parseOperator('->123User')).toThrow(/Invalid operator format/)
     })
 
     it('throws on whitespace in operator', () => {
-      expect(() => parseOperator('-> User')).toThrow(OperatorParseError)
+      expect(() => parseOperator('-> User')).toThrow(/Invalid operator format/)
     })
 
     it('allows underscores in type names for relationship types', () => {
@@ -138,7 +138,7 @@ describe('parseOperator', () => {
 
     it('throws on invalid characters in type', () => {
       // Hyphens and other special characters are not allowed
-      expect(() => parseOperator('->User-Name')).toThrow(OperatorParseError)
+      expect(() => parseOperator('->User-Name')).toThrow(/Invalid operator format/)
     })
 
     it('includes operator string in error', () => {
@@ -146,8 +146,13 @@ describe('parseOperator', () => {
         parseOperator('>>Invalid')
         expect.fail('Should have thrown')
       } catch (error) {
-        expect(error).toBeInstanceOf(OperatorParseError)
-        expect((error as OperatorParseError).operator).toBe('>>Invalid')
+        // Check error properties instead of instanceof (doesn't work across RPC boundaries)
+        // Custom properties like 'operator' don't survive RPC serialization, but the operator
+        // string is included in the message, so verify it there
+        expect(error).toHaveProperty('name', 'OperatorParseError')
+        const message = (error as Error).message
+        expect(message).toContain('Invalid operator format')
+        expect(message).toContain('>>Invalid')
       }
     })
   })
@@ -251,11 +256,11 @@ describe('splitChainedOperators', () => {
 
   describe('error handling', () => {
     it('throws on empty string', () => {
-      expect(() => splitChainedOperators('')).toThrow(OperatorParseError)
+      expect(() => splitChainedOperators('')).toThrow(/cannot be empty/)
     })
 
     it('throws on invalid operator format', () => {
-      expect(() => splitChainedOperators('>>invalid')).toThrow(OperatorParseError)
+      expect(() => splitChainedOperators('>>invalid')).toThrow(/Invalid operator format/)
     })
   })
 })
