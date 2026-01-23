@@ -1,0 +1,41 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "dist",
+    "rootDir": ".",
+    "skipLibCheck": true
+  },
+  "include": [
+    "types/**/*",
+    "ai/**/*",
+    "api/**/*",
+    "do/**/*",
+    "db/**/*",
+    "rpc/**/*",
+    "sdk/**/*",
+    "index.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "proxy",
+    "tail",
+    "site",
+    "tests",
+    "cli",
+    "integrations",
+    "workers",
+    "$",
+    "functions",
+    "tools",
+    "voice",
+    "ai/agents",
+    "api/routes/agents.ts",
+    "**/*.test.ts",
+    "**/__tests__/**"
+  ]
+}

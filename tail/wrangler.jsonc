@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.cloudflare.com/wrangler.json",
+  "name": "do-tail",
+  "main": "index.ts",
+  "compatibility_date": "2026-01-23",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+
+  // Durable Object for buffering tail events
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "TAIL_COLLECTOR",
+        "class_name": "TailCollectorDO"
+      }
+    ]
+  },
+
+  // Migrations
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["TailCollectorDO"]
+    }
+  ],
+
+  // R2 bucket for storing tail metrics
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "do-tail-events"
+    }
+  ],
+
+  // Development settings
+  "dev": {
+    "port": 8788,
+    "local_protocol": "http"
+  },
+
+  // Environment variables
+  "vars": {
+    "ENVIRONMENT": "development",
+    "FLUSH_INTERVAL_SECONDS": "30",
+    "BATCH_SIZE": "1000",
+    "LOG_LEVEL": "info",
+    "ANALYTICS_ENABLED": "false"
+  },
+
+  // Analytics Engine (optional)
+  // Uncomment to enable Analytics Engine
+  // "analytics_engine_datasets": [
+  //   {
+  //     "binding": "ANALYTICS_ENGINE",
+  //     "dataset": "do_observability"
+  //   }
+  // ],
+
+  // Production environment
+  "env": {
+    "production": {
+      "vars": {
+        "ENVIRONMENT": "production",
+        "FLUSH_INTERVAL_SECONDS": "60",
+        "BATCH_SIZE": "5000",
+        "LOG_LEVEL": "warn",
+        "ANALYTICS_ENABLED": "true"
+      }
+    },
+    "staging": {
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "FLUSH_INTERVAL_SECONDS": "30",
+        "BATCH_SIZE": "1000",
+        "LOG_LEVEL": "info",
+        "ANALYTICS_ENABLED": "true"
+      }
+    }
+  }
+}
