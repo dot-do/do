@@ -1,6 +1,6 @@
 {
   "name": "@dotdo/do",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Digital Object - Every business entity IS a Durable Object. Unified edge-native platform with CRUD APIs, SDK, AI, payments, and more.",
   "type": "module",
   "main": "dist/index.js",
@@ -102,10 +102,10 @@
   "homepage": "https://do.md",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/drivly/do.git"
+    "url": "git+https://github.com/dot-do/do.git"
   },
   "bugs": {
-    "url": "https://github.com/drivly/do/issues"
+    "url": "https://github.com/dot-do/do/issues"
   },
   "publishConfig": {
     "access": "public",
