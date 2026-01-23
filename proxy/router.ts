@@ -76,44 +76,43 @@ function apiResponse<T>(
 /**
  * Build clickable links for an RPC method response
  */
-function buildRPCLinks(baseUrl: string, method: string): Record<string, string> {
+function buildRPCLinks(baseUrl: string, path: string): Record<string, string> {
+  // Normalize: strip do. prefix
+  const method = path.startsWith('do.') ? path.slice(3) : path
+
   const links: Record<string, string> = {
     self: `${baseUrl}/rpc/${method}`,
     api: `${baseUrl}/.do`,
     mcp: `${baseUrl}/mcp`,
   }
 
-  // Add navigation links based on method
   const parts = method.split('.')
-  if (parts[0] === 'do' && parts.length >= 2) {
-    const namespace = parts[1]
+  const namespace = parts[0]
 
-    // Add collection navigation
-    if (['nouns', 'verbs', 'things', 'actions', 'users', 'agents', 'functions', 'workflows'].includes(namespace)) {
-      links.list = `${baseUrl}/rpc/do.${namespace}.list`
-      if (parts[2] === 'get' || parts[2] === 'list') {
-        links.create = `${baseUrl}/rpc/do.${namespace}.create`
-      }
+  // Add collection navigation
+  if (['nouns', 'verbs', 'things', 'actions', 'users', 'agents', 'functions', 'workflows'].includes(namespace)) {
+    links.list = `${baseUrl}/rpc/${namespace}.list`
+    if (parts[1] === 'get' || parts[1] === 'list') {
+      links.create = `${baseUrl}/rpc/${namespace}.create`
     }
+  }
 
-    // Add related methods
-    if (namespace === 'identity') {
-      links.getContext = `${baseUrl}/rpc/do.identity.getContext`
-      links.setContext = `${baseUrl}/rpc/do.identity.setContext`
-    }
+  // Add related methods
+  if (namespace === 'identity') {
+    links.getContext = `${baseUrl}/rpc/identity.getContext`
+    links.setContext = `${baseUrl}/rpc/identity.setContext`
+  }
 
-    if (namespace === 'system') {
-      links.ping = `${baseUrl}/rpc/do.system.ping`
-      links.stats = `${baseUrl}/rpc/do.system.stats`
-      links.schema = `${baseUrl}/rpc/do.system.schema`
-    }
+  if (namespace === 'system') {
+    links.ping = `${baseUrl}/rpc/system.ping`
+    links.schema = `${baseUrl}/rpc/system.schema`
+  }
 
-    if (namespace === 'collections') {
-      links.nouns = `${baseUrl}/rpc/do.nouns.list`
-      links.things = `${baseUrl}/rpc/do.things.list`
-      links.actions = `${baseUrl}/rpc/do.actions.list`
-      links.functions = `${baseUrl}/rpc/do.functions.list`
-    }
+  if (namespace === 'collections') {
+    links.nouns = `${baseUrl}/rpc/nouns.list`
+    links.things = `${baseUrl}/rpc/things.list`
+    links.actions = `${baseUrl}/rpc/actions.list`
+    links.functions = `${baseUrl}/rpc/functions.list`
   }
 
   return links
@@ -172,24 +171,24 @@ export function createRouter(env: Env) {
 
     // Return available methods as clickable links
     return c.json(apiResponse(url.hostname, {
-      description: 'RPC API - call methods via POST or explore via GET',
+      description: 'CapnWeb RPC via rpc.do - POST { path, args } to / or /rpc',
       usage: {
-        post: 'POST /rpc with JSON body: { "method": "do.identity.get", "args": [] }',
-        get: 'GET /rpc/{method} to see method info and call with no args',
+        post: 'POST /rpc with JSON body: { "path": "identity.get", "args": [] }',
+        get: 'GET /rpc/{path} to explore methods',
       },
     }, {
       self: `${url.origin}/rpc`,
-      identity: `${url.origin}/rpc/do.identity.get`,
-      collections: `${url.origin}/rpc/do.collections.list`,
-      system: `${url.origin}/rpc/do.system.schema`,
-      ping: `${url.origin}/rpc/do.system.ping`,
+      identity: `${url.origin}/rpc/identity.get`,
+      collections: `${url.origin}/rpc/collections.list`,
+      schema: `${url.origin}/rpc/system.schema`,
+      ping: `${url.origin}/rpc/system.ping`,
       mcp: `${url.origin}/mcp`,
       api: `${url.origin}/.do`,
     }, colo))
   })
 
-  // GET /rpc/do.collections.list - List all collections with links
-  app.get('/rpc/do.collections.list', async (c) => {
+  // GET /rpc/collections.list - List all collections with links
+  app.get('/rpc/collections.list', async (c) => {
     const url = new URL(c.req.url)
     const colo = c.req.header('cf-ray')?.split('-')[1]
 
@@ -212,14 +211,14 @@ export function createRouter(env: Env) {
     ]
 
     const links: Record<string, string> = {
-      self: `${url.origin}/rpc/do.collections.list`,
+      self: `${url.origin}/rpc/collections.list`,
       rpc: `${url.origin}/rpc`,
       api: `${url.origin}/.do`,
     }
 
     // Add link for each collection
     for (const col of collections) {
-      links[col.name] = `${url.origin}/rpc/do.${col.name}.list`
+      links[col.name] = `${url.origin}/rpc/${col.name}.list`
     }
 
     return c.json(apiResponse(url.hostname, { collections }, links, colo))
@@ -514,8 +513,8 @@ export function createRouter(env: Env) {
         api: `${url.origin}/api`,
         rpc: `${url.origin}/rpc`,
         mcp: `${url.origin}/mcp`,
-        collections: `${url.origin}/rpc/do.collections.list`,
-        schema: `${url.origin}/rpc/do.system.schema`,
+        collections: `${url.origin}/rpc/collections.list`,
+        schema: `${url.origin}/rpc/system.schema`,
       }, colo))
     } catch (error) {
       return c.json({
