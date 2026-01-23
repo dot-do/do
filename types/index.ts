@@ -36,9 +36,22 @@ export * from './rpc'
 // Observability (events, metrics, tracing)
 export * from './observability'
 
-// MDXUI types - Zod schemas and component props
+// MDXUI types - import directly from 'mdxui' package
 // DO entities ARE the props for MDXUI components
-export * from './mdxui'
+// Note: Use `import from 'mdxui'` directly to avoid conflicts with DO types
+export type {
+  NavItem,
+  ThemeMode,
+  ActionProp,
+  ActionsProps,
+  Testimonial,
+  FAQItem,
+  StatItem,
+  TeamMember,
+  LogoItem,
+  AuthProvider,
+  FeatureItem,
+} from './mdxui'
 
 // Site types (mdxui - 14 site types, SiteComponents)
 // Note: Exclude types that conflict with ./mdxui exports
