@@ -232,23 +232,16 @@ export function createRouter(env: Env) {
     const method = url.pathname.replace('/rpc/', '')
 
     // For GET requests, try to call the method with no arguments
-    // This works for read-only methods like do.identity.get, do.*.list
+    // This works for read-only methods like identity.get, *.list
     try {
       const doId = env.DO.idFromName(url.hostname)
       const stub = env.DO.get(doId)
 
-      // Call the DO with an RPC request
-      const rpcRequest = {
-        type: 'rpc',
-        id: `get-${Date.now()}`,
-        method,
-        args: [],
-      }
-
+      // Call the DO via rpc.do protocol: POST { path, args }
       const response = await stub.fetch(new Request(`${url.origin}/rpc`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(rpcRequest),
+        body: JSON.stringify({ path: method, args: [] }),
       }))
 
       if (response.ok) {
@@ -257,7 +250,7 @@ export function createRouter(env: Env) {
         // Wrap result in API response with links
         return c.json(apiResponse(url.hostname, {
           method,
-          result: result.result ?? result,
+          result,
         }, buildRPCLinks(url.origin, method), colo))
       }
 
@@ -318,7 +311,7 @@ export function createRouter(env: Env) {
       const response = await stub.fetch(new Request(`${url.origin}/rpc`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'rpc', id: 'api', method: 'do.system.schema', args: [] }),
+        body: JSON.stringify({ path: 'system.schema', args: [] }),
       }))
 
       const result = await response.json()
@@ -350,12 +343,12 @@ export function createRouter(env: Env) {
       const response = await stub.fetch(new Request(`${url.origin}/rpc`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'rpc', id: 'api', method: `do.${collection}.list`, args: [] }),
+        body: JSON.stringify({ path: `${collection}.list`, args: [] }),
       }))
 
       const result = await response.json()
 
-      return c.json(apiResponse(url.hostname, result.result ?? result, {
+      return c.json(apiResponse(url.hostname, result, {
         self: `${url.origin}/api/${collection}`,
         api: `${url.origin}/api`,
         create: `${url.origin}/api/${collection} (POST)`,
@@ -384,12 +377,12 @@ export function createRouter(env: Env) {
       const response = await stub.fetch(new Request(`${url.origin}/rpc`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'rpc', id: 'api', method: `do.${collection}.get`, args: [id] }),
+        body: JSON.stringify({ path: `${collection}.get`, args: [id] }),
       }))
 
       const result = await response.json()
 
-      return c.json(apiResponse(url.hostname, result.result ?? result, {
+      return c.json(apiResponse(url.hostname, result, {
         self: `${url.origin}/api/${collection}/${id}`,
         collection: `${url.origin}/api/${collection}`,
         update: `${url.origin}/api/${collection}/${id} (PUT)`,
@@ -417,7 +410,7 @@ export function createRouter(env: Env) {
     const response = await stub.fetch(new Request(`${url.origin}/rpc`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'rpc', id: 'api', method: `do.${collection}.create`, args: [body] }),
+      body: JSON.stringify({ path: `${collection}.create`, args: [body] }),
     }))
 
     const result = await response.json()
@@ -437,7 +430,7 @@ export function createRouter(env: Env) {
     const response = await stub.fetch(new Request(`${url.origin}/rpc`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'rpc', id: 'api', method: `do.${collection}.update`, args: [id, body] }),
+      body: JSON.stringify({ path: `${collection}.update`, args: [id, body] }),
     }))
 
     const result = await response.json()
@@ -456,7 +449,7 @@ export function createRouter(env: Env) {
     await stub.fetch(new Request(`${url.origin}/rpc`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'rpc', id: 'api', method: `do.${collection}.delete`, args: [id] }),
+      body: JSON.stringify({ path: `${collection}.delete`, args: [id] }),
     }))
 
     return c.json({ success: true }, 200)

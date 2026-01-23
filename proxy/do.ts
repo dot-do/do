@@ -9,6 +9,7 @@
  * - CDC streaming to parent ($context)
  */
 
+import { createRpcHandler } from 'rpc.do/server'
 import type { DOContext, DOType, DigitalObjectIdentity } from '../types'
 
 // =============================================================================
@@ -34,6 +35,7 @@ export class DigitalObject implements DurableObject {
   private readonly sql: SqlStorage
   private readonly state: DurableObjectState
   private readonly env: Env
+  private readonly rpcHandler: (request: Request) => Promise<Response>
 
   // Identity
   $id!: string
@@ -51,6 +53,11 @@ export class DigitalObject implements DurableObject {
 
     // Initialize schema
     this.initializeSchema()
+
+    // Create rpc.do handler
+    this.rpcHandler = createRpcHandler({
+      dispatch: (method, args) => this.dispatch(method, args),
+    })
   }
 
   // ===========================================================================
@@ -124,12 +131,26 @@ export class DigitalObject implements DurableObject {
       return this.handleWebSocket(request)
     }
 
+    // POST / or POST /rpc → CapnWeb RPC via rpc.do
+    if (request.method === 'POST' && (url.pathname === '/' || url.pathname === '/rpc')) {
+      return this.rpcHandler(request)
+    }
+
     // REST API
     if (url.pathname === '/_health') {
       return Response.json({ status: 'ok', id: this.$id, type: this.$type })
     }
 
-    // Default: route to user-defined handler or return identity
+    if (url.pathname === '/_identity') {
+      return Response.json({
+        $id: this.$id,
+        $type: this.$type,
+        $context: this.$context,
+        $version: this.$version,
+      })
+    }
+
+    // Default: return identity
     return Response.json({
       $id: this.$id,
       $type: this.$type,
@@ -156,21 +177,15 @@ export class DigitalObject implements DurableObject {
     if (typeof message !== 'string') return
 
     try {
-      const data = JSON.parse(message)
-
-      // RPC request
-      if (data.type === 'rpc' && data.method && data.id) {
-        const result = await this.handleRPC(data.method, data.args || [])
-        ws.send(JSON.stringify({
-          type: 'rpc',
-          id: data.id,
-          success: true,
-          result,
-        }))
+      const { id, path, args } = JSON.parse(message)
+      if (!path) {
+        ws.send(JSON.stringify({ id, error: 'Missing path' }))
+        return
       }
+      const result = await this.dispatch(path, args || [])
+      ws.send(JSON.stringify({ id, result }))
     } catch (error) {
       ws.send(JSON.stringify({
-        type: 'error',
         error: error instanceof Error ? error.message : 'Unknown error',
       }))
     }
@@ -185,41 +200,113 @@ export class DigitalObject implements DurableObject {
   }
 
   // ===========================================================================
-  // RPC Handler
+  // RPC Dispatch (used by rpc.do handler)
   // ===========================================================================
 
-  private async handleRPC(method: string, args: unknown[]): Promise<unknown> {
-    // Identity methods
-    if (method === 'do.identity.get') {
-      return {
-        $id: this.$id,
-        $type: this.$type,
-        $context: this.$context,
-        $version: this.$version,
-      }
+  private async dispatch(path: string, args: unknown[]): Promise<unknown> {
+    // Normalize: strip leading "do." prefix if present
+    const method = path.startsWith('do.') ? path.slice(3) : path
+
+    // Identity
+    if (method === 'identity.get') {
+      return { $id: this.$id, $type: this.$type, $context: this.$context, $version: this.$version }
     }
 
-    // Schedule methods
-    if (method === 'do.schedule') {
+    // System
+    if (method === 'system.ping') return { pong: Date.now() }
+    if (method === 'system.schema') return this.getSchema()
+
+    // Schedule
+    if (method === 'schedule') {
       const [when, callback, payload] = args as [Date | string | number, string, unknown]
       return this.schedule(when, callback, payload)
     }
+    if (method === 'schedule.cancel') return this.cancelSchedule(args[0] as string)
+    if (method === 'schedule.list') return this.listSchedules()
 
-    if (method === 'do.schedule.cancel') {
-      const [id] = args as [string]
-      return this.cancelSchedule(id)
+    // CDC
+    if (method === 'cdc.flush') return this.flushCDC()
+
+    // Collection CRUD ({collection}.{action})
+    const parts = method.split('.')
+    if (parts.length === 2) {
+      const [collection, action] = parts
+      return this.handleCollection(collection, action, args)
     }
 
-    if (method === 'do.schedule.list') {
-      return this.listSchedules()
-    }
+    throw new Error(`Method not found: ${path}`)
+  }
 
-    // CDC methods
-    if (method === 'do.cdc.flush') {
-      return this.flushCDC()
+  private getSchema(): unknown {
+    return {
+      collections: ['nouns', 'verbs', 'things', 'actions', 'functions', 'workflows', 'events', 'users', 'agents'],
+      methods: [
+        'do.identity.get',
+        'do.system.ping',
+        'do.system.schema',
+        'do.schedule',
+        'do.schedule.cancel',
+        'do.schedule.list',
+        'do.cdc.flush',
+      ],
     }
+  }
 
-    throw new Error(`Unknown RPC method: ${method}`)
+  private async handleCollection(collection: string, action: string, args: unknown[]): Promise<unknown> {
+    // Ensure collection table exists
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS "${collection}" (
+      id TEXT PRIMARY KEY DEFAULT (hex(randomblob(8))),
+      data TEXT NOT NULL,
+      created_at INTEGER DEFAULT (unixepoch()),
+      updated_at INTEGER DEFAULT (unixepoch())
+    )`)
+
+    switch (action) {
+      case 'list': {
+        const rows = this.sql.exec<{ id: string; data: string; created_at: number; updated_at: number }>(
+          `SELECT * FROM "${collection}" ORDER BY created_at DESC LIMIT 100`
+        ).toArray()
+        return { items: rows.map(r => ({ id: r.id, ...JSON.parse(r.data) })), total: rows.length }
+      }
+      case 'get': {
+        const [id] = args as [string]
+        const rows = this.sql.exec<{ id: string; data: string }>(
+          `SELECT * FROM "${collection}" WHERE id = ?`, id
+        ).toArray()
+        return rows[0] ? { id: rows[0].id, ...JSON.parse(rows[0].data) } : null
+      }
+      case 'create': {
+        const [data] = args as [Record<string, unknown>]
+        const id = crypto.randomUUID()
+        this.sql.exec(
+          `INSERT INTO "${collection}" (id, data) VALUES (?, ?)`,
+          id, JSON.stringify(data)
+        )
+        this.emitCDC('INSERT', collection, id, undefined, data)
+        return { id, ...data }
+      }
+      case 'update': {
+        const [id, data] = args as [string, Record<string, unknown>]
+        this.sql.exec(
+          `UPDATE "${collection}" SET data = ?, updated_at = unixepoch() WHERE id = ?`,
+          JSON.stringify(data), id
+        )
+        this.emitCDC('UPDATE', collection, id, undefined, data)
+        return { id, ...data }
+      }
+      case 'delete': {
+        const [id] = args as [string]
+        this.sql.exec(`DELETE FROM "${collection}" WHERE id = ?`, id)
+        this.emitCDC('DELETE', collection, id)
+        return { success: true }
+      }
+      case 'count': {
+        const rows = this.sql.exec<{ count: number }>(`SELECT COUNT(*) as count FROM "${collection}"`).toArray()
+        return { count: rows[0]?.count ?? 0 }
+      }
+      default:
+        throw new Error(`Unknown action: ${collection}.${action}`)
+    }
   }
 
   // ===========================================================================
