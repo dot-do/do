@@ -56,3 +56,6 @@ export * from './domains'
 
 // Colo awareness (geo-distribution, replication)
 export * from './colo'
+
+// OAuth storage (implements @dotdo/oauth OAuthStorage interface)
+export { DOAuthStorage } from './oauth'
