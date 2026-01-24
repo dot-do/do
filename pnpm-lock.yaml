@@ -11,15 +11,18 @@ importers:
       '@dotdo/apis':
         specifier: ^0.1.0
         version: 0.1.0(@cloudflare/workers-types@4.20260123.0)(@dotdo/pglite@0.1.0)(@dotdo/postgres@0.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@dotdo/oauth':
+        specifier: ^0.1.1
+        version: 0.1.1(hono@4.11.5)
       ai-database:
         specifier: ^2.1.3
-        version: 2.1.3(ai-workflows@2.1.3)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.19.7)(terser@5.46.0)(yaml@2.8.2))
+        version: 2.1.3(ai-workflows@2.1.3)(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.19.7)(terser@5.46.0)(yaml@2.8.2))
       ai-evaluate:
         specifier: ^2.1.5
-        version: 2.1.5
+        version: 2.1.5(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       ai-functions:
         specifier: ^2.1.3
-        version: 2.1.3
+        version: 2.1.3(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       ai-primitives:
         specifier: ^0.1.0
         version: 0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@opentelemetry/api@1.9.0)(@swc/helpers@0.5.15)(@types/debug@4.1.12)(@types/node@22.19.7)(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(solid-js@1.9.11)(svelte@4.2.20)(terser@5.46.0)(typescript@5.9.3)(vue@3.5.27(typescript@5.9.3))(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))(ws@8.18.0)(yaml@2.8.2)(zod@4.3.6)
@@ -31,10 +34,10 @@ importers:
         version: 2.1.3
       digital-tools:
         specifier: ^2.1.3
-        version: 2.1.3(ai-workflows@2.1.3)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.19.7)(terser@5.46.0)(yaml@2.8.2))
+        version: 2.1.3(ai-workflows@2.1.3)(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.19.7)(terser@5.46.0)(yaml@2.8.2))
       digital-workers:
         specifier: ^2.1.3
-        version: 2.1.3
+        version: 2.1.3(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       hono:
         specifier: ^4.7.0
         version: 4.11.5
@@ -391,6 +394,11 @@ packages:
 
   '@dotdo/documentdb@0.1.0':
     resolution: {integrity: sha512-MdML9TM99RS71Khrrw0y8Vm+SxmgcfCmwmOf5gGaGp/mVAHdSJZgWLVVom9jw5iwCv5dpZjZkZWZ7L/0goBklQ==}
+
+  '@dotdo/oauth@0.1.1':
+    resolution: {integrity: sha512-nI96Tlsx85ce1PueQWUFA1CLOdREqlD+B7UTaCrlyMKFg18NzYeANapV4H/nN1r3OQLuqE7X7ZGNsoPWAdJFsA==}
+    peerDependencies:
+      hono: '>=4.0.0'
 
   '@dotdo/pg-geo@0.1.0':
     resolution: {integrity: sha512-YGbKpunhqm6Mu7IymwVKC4mB5YwnEgC02WxmjflqMHKq1QzIdZU6p5YBrxnerLAKrJn4j6TcjZ+gph81nfpylw==}
@@ -2477,8 +2485,8 @@ packages:
   base64-js@1.5.1:
     resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
 
-  baseline-browser-mapping@2.9.17:
-    resolution: {integrity: sha512-agD0MgJFUP/4nvjqzIB29zRPUuCF7Ge6mEv9s8dHrtYD7QWXRcx75rOADE/d5ah1NI+0vkDl0yorDd5U852IQQ==}
+  baseline-browser-mapping@2.9.18:
+    resolution: {integrity: sha512-e23vBV1ZLfjb9apvfPk4rHVu2ry6RIr2Wfs+O324okSidrX7pTAnEJPCh/O5BtRlr7QtZI7ktOP3vsqr7Z5XoA==}
     hasBin: true
 
   bignumber.js@9.3.1:
@@ -4415,6 +4423,37 @@ packages:
 
   oauth.do@0.2.0:
     resolution: {integrity: sha512-Ea+5gMWfR9+yaI0VJcRJwhoIpKjAZABx0BIfwsbidiIE7NqMdIF+QHWj5w+bS1GSEoZqCoVr6QUadBUb5lWcOA==}
+    engines: {node: '>=18.0.0'}
+    hasBin: true
+    peerDependencies:
+      '@radix-ui/themes': '>=3.0.0'
+      '@tanstack/react-query': '>=5.0.0'
+      '@workos-inc/authkit-react': '>=0.5.0'
+      '@workos-inc/widgets': '>=1.0.0'
+      hono: '>=4.0.0'
+      jose: '>=5.0.0'
+      react: '>=18.0.0'
+      react-dom: '>=18.0.0'
+    peerDependenciesMeta:
+      '@radix-ui/themes':
+        optional: true
+      '@tanstack/react-query':
+        optional: true
+      '@workos-inc/authkit-react':
+        optional: true
+      '@workos-inc/widgets':
+        optional: true
+      hono:
+        optional: true
+      jose:
+        optional: true
+      react:
+        optional: true
+      react-dom:
+        optional: true
+
+  oauth.do@0.2.2:
+    resolution: {integrity: sha512-X5mOrvvym89UoByqdCZfthZTL6nSFUbQPx4C9WQKPn9nDjYPEDs0Zw+ksh9yqvUw+73trH8crlvU0qrmP5W5pA==}
     engines: {node: '>=18.0.0'}
     hasBin: true
     peerDependencies:
@@ -6514,7 +6553,7 @@ snapshots:
 
   '@dotdo/apis@0.1.0(@cloudflare/workers-types@4.20260123.0)(@dotdo/pglite@0.1.0)(@dotdo/postgres@0.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
-      '@dotdo/documentdb': 0.1.0(@cloudflare/workers-types@4.20260123.0)
+      '@dotdo/documentdb': 0.1.0(@cloudflare/workers-types@4.20260123.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@electric-sql/pglite': 0.3.15
       hono: 4.11.5
       postgres.do: 0.1.0(@dotdo/pglite@0.1.0)(@dotdo/postgres@0.1.0)(hono@4.11.5)
@@ -6536,19 +6575,30 @@ snapshots:
       - react-dom
       - utf-8-validate
 
-  '@dotdo/documentdb@0.1.0(@cloudflare/workers-types@4.20260123.0)':
+  '@dotdo/documentdb@0.1.0(@cloudflare/workers-types@4.20260123.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       '@dotdo/pg-geo': 0.1.0(@cloudflare/workers-types@4.20260123.0)
       '@dotdo/postgres': 0.1.0
       '@dotdo/postgres-shared': 0.1.0(hono@4.11.5)
-      ai-evaluate: 2.1.5
+      ai-evaluate: 2.1.5(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       capnweb: 0.4.0
       hono: 4.11.5
     transitivePeerDependencies:
       - '@cloudflare/workers-types'
+      - '@radix-ui/themes'
+      - '@tanstack/react-query'
+      - '@workos-inc/authkit-react'
+      - '@workos-inc/widgets'
       - bufferutil
       - drizzle-orm
+      - jose
+      - react
+      - react-dom
       - utf-8-validate
+
+  '@dotdo/oauth@0.1.1(hono@4.11.5)':
+    dependencies:
+      hono: 4.11.5
 
   '@dotdo/pg-geo@0.1.0(@cloudflare/workers-types@4.20260123.0)':
     dependencies:
@@ -8423,14 +8473,22 @@ snapshots:
 
   ai-database@0.1.0: {}
 
-  ai-database@2.1.3(ai-workflows@2.1.3)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.19.7)(terser@5.46.0)(yaml@2.8.2)):
+  ai-database@2.1.3(ai-workflows@2.1.3)(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.19.7)(terser@5.46.0)(yaml@2.8.2)):
     dependencies:
-      ai-functions: 2.1.3
-      mdxld: 1.9.0(ai-database@2.1.3(ai-workflows@2.1.3)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.19.7)(terser@5.46.0)(yaml@2.8.2)))(ai-functions@2.1.3)(ai-workflows@2.1.3)
+      ai-functions: 2.1.3(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      mdxld: 1.9.0(ai-database@2.1.3(ai-workflows@2.1.3)(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.19.7)(terser@5.46.0)(yaml@2.8.2)))(ai-functions@2.1.3(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(ai-workflows@2.1.3)
     optionalDependencies:
       vitest: 3.2.4(@types/debug@4.1.12)(@types/node@22.19.7)(terser@5.46.0)(yaml@2.8.2)
     transitivePeerDependencies:
+      - '@radix-ui/themes'
+      - '@tanstack/react-query'
+      - '@workos-inc/authkit-react'
+      - '@workos-inc/widgets'
       - ai-workflows
+      - hono
+      - jose
+      - react
+      - react-dom
 
   ai-directory@0.1.0(@opentelemetry/api@1.9.0)(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27):
     dependencies:
@@ -8450,16 +8508,24 @@ snapshots:
       - babel-plugin-react-compiler
       - sass
 
-  ai-evaluate@2.1.5:
+  ai-evaluate@2.1.5(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
-      ai-functions: 2.1.3
+      ai-functions: 2.1.3(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       ai-tests: 2.1.3
       capnweb: 0.2.0
     optionalDependencies:
       esbuild: 0.24.2
       miniflare: 3.20250718.3
     transitivePeerDependencies:
+      - '@radix-ui/themes'
+      - '@tanstack/react-query'
+      - '@workos-inc/authkit-react'
+      - '@workos-inc/widgets'
       - bufferutil
+      - hono
+      - jose
+      - react
+      - react-dom
       - utf-8-validate
 
   ai-experiments@0.1.0(@types/node@22.19.7)(terser@5.46.0):
@@ -8515,7 +8581,7 @@ snapshots:
     transitivePeerDependencies:
       - react
 
-  ai-functions@2.1.3:
+  ai-functions@2.1.3(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
       '@ai-sdk/amazon-bedrock': 3.0.73(zod@3.25.76)
       '@org.ai/core': 2.1.3
@@ -8524,6 +8590,17 @@ snapshots:
       language-models: 2.1.3
       yaml: 2.8.2
       zod: 3.25.76
+    optionalDependencies:
+      oauth.do: 0.2.2(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+    transitivePeerDependencies:
+      - '@radix-ui/themes'
+      - '@tanstack/react-query'
+      - '@workos-inc/authkit-react'
+      - '@workos-inc/widgets'
+      - hono
+      - jose
+      - react
+      - react-dom
 
   ai-plans@0.1.0: {}
 
@@ -9083,7 +9160,7 @@ snapshots:
 
   base64-js@1.5.1: {}
 
-  baseline-browser-mapping@2.9.17: {}
+  baseline-browser-mapping@2.9.18: {}
 
   bignumber.js@9.3.1: {}
 
@@ -9130,7 +9207,7 @@ snapshots:
 
   browserslist@4.28.1:
     dependencies:
-      baseline-browser-mapping: 2.9.17
+      baseline-browser-mapping: 2.9.18
       caniuse-lite: 1.0.30001766
       electron-to-chromium: 1.5.278
       node-releases: 2.0.27
@@ -9622,20 +9699,37 @@ snapshots:
 
   diff@5.2.2: {}
 
-  digital-tools@2.1.3(ai-workflows@2.1.3)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.19.7)(terser@5.46.0)(yaml@2.8.2)):
+  digital-tools@2.1.3(ai-workflows@2.1.3)(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.19.7)(terser@5.46.0)(yaml@2.8.2)):
     dependencies:
-      ai-database: 2.1.3(ai-workflows@2.1.3)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.19.7)(terser@5.46.0)(yaml@2.8.2))
-      ai-functions: 2.1.3
+      ai-database: 2.1.3(ai-workflows@2.1.3)(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.19.7)(terser@5.46.0)(yaml@2.8.2))
+      ai-functions: 2.1.3(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       zod: 3.25.76
     transitivePeerDependencies:
+      - '@radix-ui/themes'
+      - '@tanstack/react-query'
+      - '@workos-inc/authkit-react'
+      - '@workos-inc/widgets'
       - ai-workflows
+      - hono
+      - jose
+      - react
+      - react-dom
       - vitest
 
-  digital-workers@2.1.3:
+  digital-workers@2.1.3(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
-      ai-functions: 2.1.3
+      ai-functions: 2.1.3(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       ai-workflows: 2.1.3
       zod: 3.25.76
+    transitivePeerDependencies:
+      - '@radix-ui/themes'
+      - '@tanstack/react-query'
+      - '@workos-inc/authkit-react'
+      - '@workos-inc/widgets'
+      - hono
+      - jose
+      - react
+      - react-dom
 
   dom-converter@0.2.0:
     dependencies:
@@ -11067,12 +11161,12 @@ snapshots:
 
   mdn-data@2.0.30: {}
 
-  mdxld@1.9.0(ai-database@2.1.3(ai-workflows@2.1.3)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.19.7)(terser@5.46.0)(yaml@2.8.2)))(ai-functions@2.1.3)(ai-workflows@2.1.3):
+  mdxld@1.9.0(ai-database@2.1.3(ai-workflows@2.1.3)(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.19.7)(terser@5.46.0)(yaml@2.8.2)))(ai-functions@2.1.3(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(ai-workflows@2.1.3):
     dependencies:
       arktype: 2.1.29
     optionalDependencies:
-      ai-database: 2.1.3(ai-workflows@2.1.3)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.19.7)(terser@5.46.0)(yaml@2.8.2))
-      ai-functions: 2.1.3
+      ai-database: 2.1.3(ai-workflows@2.1.3)(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.19.7)(terser@5.46.0)(yaml@2.8.2))
+      ai-functions: 2.1.3(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       ai-workflows: 2.1.3
 
   mdxui@2.1.1(@types/react@18.3.27)(react@18.3.1):
@@ -11503,6 +11597,16 @@ snapshots:
     optionalDependencies:
       hono: 4.11.5
       keytar: 7.9.0
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+    optional: true
+
+  oauth.do@0.2.2(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
+    dependencies:
+      keytar: 7.9.0
+      open: 10.2.0
+    optionalDependencies:
+      hono: 4.11.5
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
     optional: true

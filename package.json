@@ -1,6 +1,6 @@
 {
   "name": "@dotdo/do",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Digital Object - Every business entity IS a Durable Object. Unified edge-native platform with CRUD APIs, SDK, AI, payments, and more.",
   "type": "module",
   "main": "dist/index.js",
