@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@dotdo/apis':
+        specifier: ^0.1.0
+        version: 0.1.0(@cloudflare/workers-types@4.20260123.0)(@dotdo/pglite@0.1.0)(@dotdo/postgres@0.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       ai-database:
         specifier: ^2.1.3
         version: 2.1.3(ai-workflows@2.1.3)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.19.7)(terser@5.46.0)(yaml@2.8.2))
@@ -19,7 +22,7 @@ importers:
         version: 2.1.3
       ai-primitives:
         specifier: ^0.1.0
-        version: 0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@opentelemetry/api@1.9.0)(@swc/helpers@0.5.15)(@types/debug@4.1.12)(@types/node@22.19.7)(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(solid-js@1.9.11)(svelte@4.2.20)(terser@5.46.0)(typescript@5.9.3)(vue@3.5.27(typescript@5.9.3))(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))(ws@8.18.0)(yaml@2.8.2)(zod@4.3.6)
+        version: 0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@opentelemetry/api@1.9.0)(@swc/helpers@0.5.15)(@types/debug@4.1.12)(@types/node@22.19.7)(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(solid-js@1.9.11)(svelte@4.2.20)(terser@5.46.0)(typescript@5.9.3)(vue@3.5.27(typescript@5.9.3))(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))(ws@8.18.0)(yaml@2.8.2)(zod@4.3.6)
       ai-providers:
         specifier: ^2.1.3
         version: 2.1.3(zod@4.3.6)
@@ -41,15 +44,16 @@ importers:
       mdxui:
         specifier: ^2.1.1
         version: 2.1.1(@types/react@18.3.27)(react@18.3.1)
-      oauth.do:
-        specifier: ^0.2.0
-        version: 0.2.0(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       rpc.do:
         specifier: ^0.2.0
         version: 0.2.0(oauth.do@0.2.0(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
       zod:
         specifier: ^4.3.6
         version: 4.3.6
+    optionalDependencies:
+      oauth.do:
+        specifier: ^0.2.0
+        version: 0.2.0(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: ^0.12.6
@@ -381,6 +385,40 @@ packages:
     resolution: {integrity: sha512-+MKAJEOfaBe5SmV6t34p80MMKhjvUz0vRrvVJbPT0WElzaOJ/1xs+D+KDv+tD/NE5ujfrChEcshd4fLn0wpiqg==}
     peerDependencies:
       react: '>=16.8.0'
+
+  '@dotdo/apis@0.1.0':
+    resolution: {integrity: sha512-VFi0LFS9vE5M/3K73m9+78L7jGEIoPX5RjkFjaQ/O0H9Fn03yQQcXAar/qDsPzg/SU8zd2LqVcDRltCTBgWDkQ==}
+
+  '@dotdo/documentdb@0.1.0':
+    resolution: {integrity: sha512-MdML9TM99RS71Khrrw0y8Vm+SxmgcfCmwmOf5gGaGp/mVAHdSJZgWLVVom9jw5iwCv5dpZjZkZWZ7L/0goBklQ==}
+
+  '@dotdo/pg-geo@0.1.0':
+    resolution: {integrity: sha512-YGbKpunhqm6Mu7IymwVKC4mB5YwnEgC02WxmjflqMHKq1QzIdZU6p5YBrxnerLAKrJn4j6TcjZ+gph81nfpylw==}
+    peerDependencies:
+      '@cloudflare/workers-types': ^4.0.0
+    peerDependenciesMeta:
+      '@cloudflare/workers-types':
+        optional: true
+
+  '@dotdo/pglite@0.1.0':
+    resolution: {integrity: sha512-UuPbZ3b4QZz2hKYeH+yBUsApbJWp+eTToANvkv+RXbwU6oCtu0pI9Ck/Wh8N0JNqVRNsqJUW9Cm/aSAnCSUy5A==}
+
+  '@dotdo/postgres-shared@0.1.0':
+    resolution: {integrity: sha512-8FzRFc7CfphDwoacNAArsywDpIQ2ujAvzaYINBDqY6XRxkxqqOjpkH7yOX6XMX91AAKC2npO07XUd7fjEgYZyg==}
+    peerDependencies:
+      hono: ^4.0.0
+    peerDependenciesMeta:
+      hono:
+        optional: true
+
+  '@dotdo/postgres@0.1.0':
+    resolution: {integrity: sha512-+MPr86tc+yd7uivbTzJfCJtt1geTEcT7lBT5aQXH4ZW/0hfvZPAOKYXcZw1513malnFvKjTNS/9Q07H43oIfNQ==}
+
+  '@electric-sql/pglite@0.2.17':
+    resolution: {integrity: sha512-qEpKRT2oUaWDH6tjRxLHjdzMqRUGYDnGZlKrnL4dJ77JVMcP2Hpo3NYnOSPKdZdeec57B6QPprCUFg0picx5Pw==}
+
+  '@electric-sql/pglite@0.3.15':
+    resolution: {integrity: sha512-Cj++n1Mekf9ETfdc16TlDi+cDDQF0W7EcbyRHYOAeZdsAe8M/FJg18itDTSwyHfar2WIezawM9o0EKaRGVKygQ==}
 
   '@emnapi/runtime@1.8.1':
     resolution: {integrity: sha512-mehfKSMWjjNol8659Z8KxEMrdSJDDot5SXMq00dM8BN4o+CLNXQ0xH2V7EchNHV4RmbZLmmPdEaXZc5H2FXmDg==}
@@ -1708,6 +1746,135 @@ packages:
   '@tokenizer/token@0.3.0':
     resolution: {integrity: sha512-OvjF+z51L3ov0OyAU0duzsYuvO01PH7x4t6DJx+guahgTnBHkhJdG7soQeTSFLWN3efnHyibZ4Z8l2EuWwJN3A==}
 
+  '@turf/area@7.3.2':
+    resolution: {integrity: sha512-d7IuEjAO3TSX5aVeL5WXrtCZCwxUAUOD4+LZ+VjoEe2THmYKdUknCPbH6rdhMBzLyZNuSVRmpRD/QfpCnLqoZg==}
+
+  '@turf/bbox-polygon@7.3.2':
+    resolution: {integrity: sha512-ofCbDrMlpqPbsRmXeCKfeKl3tV7q+6v/D3/zAx9C2flTFc6PoWPM05HPj5W+dDejpchm6p7MnNXmVR2k3Uw8sA==}
+
+  '@turf/bbox@7.3.2':
+    resolution: {integrity: sha512-iohGIDVqi8Ck7VQY2Emp490BShWKixG8wkVPQ7qO4fXRqJwrWO7ntU9XPB+r0qs6Y8kaSd+nDnvG3VFfKDb+Vg==}
+
+  '@turf/bearing@7.3.2':
+    resolution: {integrity: sha512-Gh6GLcR3oeORPvGuDkp5jS774KQkZEVMmmYjYFod8akZNhALlM82hHHWpeqI2M/GsmhIdeMw1qNDzY3n8i+7dA==}
+
+  '@turf/boolean-contains@7.3.2':
+    resolution: {integrity: sha512-UO+n7bANXk3eWJsukrig4wGA6V1WcYlDtlhvfhmpygXGlWl8+Ta7+L6ybm5Mal3U6zUmZ8gyVOq4rDhCLz+4Vw==}
+
+  '@turf/boolean-disjoint@7.3.2':
+    resolution: {integrity: sha512-8cz3fAWldktvCEmIwMvzEq0q7JnICJPZeQ/xPm+XccGbRcGHQZOFI3wZCemQh6akRowWfQ8PgQu2OeJXJbvIuA==}
+
+  '@turf/boolean-equal@7.3.2':
+    resolution: {integrity: sha512-ttve2ghdgkKHVI1gPwKj+XIyPirawhiUZKciLwIIaVgVrihiehpk4OY5Rn4kMWbvYzQTAKDUTfSXVM6fzQFeYA==}
+
+  '@turf/boolean-intersects@7.3.2':
+    resolution: {integrity: sha512-ucNeh2pq0nzcwSHBIfv3Sq6K/ANNf01ZtSQsR/ASzvsUi3LEG6KtTI49xVkz7n4Chl/LkWscDqqKpAq0t04xYA==}
+
+  '@turf/boolean-overlap@7.3.2':
+    resolution: {integrity: sha512-xzy/wpf2OpIhyZ80aWU9UtT87w7iQtAPOCyb5szfBcX2L+m4Ii5pVx53yZbKFct16i/zObc4W6gI9N5oHyOBkg==}
+
+  '@turf/boolean-point-in-polygon@7.3.2':
+    resolution: {integrity: sha512-PAfPDQ0TW1+VLgZ7tReTSyZ/X41AW7/nMRQxVpY+h/aG7JomZJ779lojnODT4dWCn3IMTA3xD2dDDfVYBAQMYg==}
+
+  '@turf/boolean-point-on-line@7.3.2':
+    resolution: {integrity: sha512-1hDfbdBgX9qpMmCnBqeNgRC3Bl/hlNGR42SvGmejXCjaZmheP+V8pXWJgF0WDxAzYkb7opqS8Vta4+EymUU5GQ==}
+
+  '@turf/boolean-within@7.3.2':
+    resolution: {integrity: sha512-OiYCW/ic35lsG5yV5mw4QRHwnUqyfjmRwfqiGbbfXH1M2N/O7NeDhEuZ7xjJrVHpSMzBux02JCJzd8F8I+NnxA==}
+
+  '@turf/buffer@7.3.2':
+    resolution: {integrity: sha512-yd6y83T6E4oImfcgwJDagoJw9EGsxbENiA6RqBIQ9Wckrq1oNeKKVG/CDlXkvbyDIAtmz/t5Z99zqTFWZ/bxvg==}
+
+  '@turf/center-of-mass@7.3.2':
+    resolution: {integrity: sha512-qAhmuqnjK+iHMyjpXVpIxW560mba2Ofe0rLn9NyEJl++58nUVnirTibW7Wq5O/z6axYdeAtulci0TLB9TSJpYQ==}
+
+  '@turf/center@7.3.2':
+    resolution: {integrity: sha512-QOAdTaJStVkSx0a3pJ03UWZqIGzgh3gCZisNp/3PcTSZmf5I/KAmZh5IxUGb5+9J6l6zHRPRaDeWVTGWXexR2A==}
+
+  '@turf/centroid@7.3.2':
+    resolution: {integrity: sha512-zWlX/t7goUx+FqCYzyscO7muXPSADb5nTGXWAbRR51P3Zsdx24P5tJshJhrHwIb3OR9a+YE4ig568Clex6tc2g==}
+
+  '@turf/circle@7.3.2':
+    resolution: {integrity: sha512-LeVWEacd9PZEgnmUA1ICZ9VabAXXJFbiX6AOWXs/AW0yNhTlrjRwZUOKOQxfde/kc/R8MAoELnKHEEAEEfnPng==}
+
+  '@turf/clean-coords@7.3.2':
+    resolution: {integrity: sha512-O7gnwgUkFbvjnCmq4dyECkYshcXZNqP8pE+DQNC26xG86+qeBlrPU8DjR7aumcK8MezC9tYqw0vb350/sKYBVQ==}
+
+  '@turf/clone@7.3.2':
+    resolution: {integrity: sha512-ET6EqfEbDq4EsvyhC5Fwyg5hkkRGcHUM7v63sqbLtz4bY2cSAZ1gGcgmBQdztSXQyKqSsFkIXpp1amfrLATNOQ==}
+
+  '@turf/convex@7.3.2':
+    resolution: {integrity: sha512-RMgqVueFH5RHKB15Iyhi3K0nuXQeDKIYYyLiMpUTjnXfoRaebiFghP2FKqLFYKG8xgTrHg6ntAAWD+zPrk9IXg==}
+
+  '@turf/destination@7.3.2':
+    resolution: {integrity: sha512-qG8fbgroIe8v8H+xncwQZSUgrhvRhfsEskEezbKDyTYC10UNhOonCNQNJyfm16Bx8Dz0FcEoaJOYkTGrfaf+PA==}
+
+  '@turf/difference@7.3.2':
+    resolution: {integrity: sha512-7EGHIlKRhhfDah2VxSz7wdRV2lrfhAjCDQh7LeVWG0sMCjL86Lkdqgz7YbH3ytVJYjCBLYlfYD2rLEMT+I1WyA==}
+
+  '@turf/distance@7.3.2':
+    resolution: {integrity: sha512-aY2HQDZpu/doKRUTEcBKdV2olNOD1x0wKR6ujzC+D1EZLKWOEmTJRR+6OjzB+xuv5zZbhFPe9f0MXEuNDxzwfQ==}
+
+  '@turf/geojson-rbush@7.3.2':
+    resolution: {integrity: sha512-0cUSyLotPClSzPvD7XM88qlaRMkfZJJuwUE/p8rhpvGk53SjVexMjltohkOFd0QFmayCovrT81OSgGcqt91zYA==}
+
+  '@turf/helpers@7.3.2':
+    resolution: {integrity: sha512-5HFN42rgWjSobdTMxbuq+ZdXPcqp1IbMgFYULTLCplEQM3dXhsyRFe7DCss4Eiw12iW3q6Z5UeTNVfITsE5lgA==}
+
+  '@turf/intersect@7.3.2':
+    resolution: {integrity: sha512-+bWr3Ir5APW0NgghN3z+1OQzLPSjSDIP94Vk5Um41GZYq9drb7z/0gnfDZoeflAETvANgC/vW8+E5m4LK4SNEA==}
+
+  '@turf/invariant@7.3.2':
+    resolution: {integrity: sha512-brGmL1EFhZH/YNXhq6S+8sPWBEnmvEyxMWJO8bUNOFZyWHYiRTwxQHZM+An1blkbQ77PiEzsdNAspZqE1j7YKA==}
+
+  '@turf/jsts@2.7.2':
+    resolution: {integrity: sha512-zAezGlwWHPyU0zxwcX2wQY3RkRpwuoBmhhNE9HY9kWhFDkCxZ3aWK5URKwa/SWKJbj9aztO+8vtdiBA28KVJFg==}
+
+  '@turf/kinks@7.3.2':
+    resolution: {integrity: sha512-n7PH9CFavxetH9/hHEyODYuNmjW2B/CE0M9Ua4h5XroV711KvGJtlxk09uASMcl5aO9EAv+ksiHx6FE10Mzdjg==}
+
+  '@turf/length@7.3.2':
+    resolution: {integrity: sha512-dqWRY90A/8yqhDMlJ7ye1NT9pCnsBpmvKTFpEDtAgJjj/fXzYy1MZOKLRRN7fZIBQpLJMTEdLb6yjcEIwZjX8A==}
+
+  '@turf/line-intersect@7.3.2':
+    resolution: {integrity: sha512-qsMUml7MI/x1iLcQzCuD/LlAxQUfMDR6PoVwQ32fGF7dCqfdMkKWoMz4Qn5WyPCeSyW8BchuAjWp5FnVtOeLeg==}
+
+  '@turf/line-overlap@7.3.2':
+    resolution: {integrity: sha512-oao5Zbs21bX5prTrxdjgjYEc9bBfBDv4dkRqDaFk1pzNyx9zD2uXlifaPaSjo/GFJ5OEfTews8r3nSUXzFN+yA==}
+
+  '@turf/line-segment@7.3.2':
+    resolution: {integrity: sha512-Dx1yQ31fMm3PqYWo5S/5/zlcMaCV02G2alW5FSnJCu9Yc1/sBMxjjuVpF92roOV+XRE9zl50DThATikQB8+roA==}
+
+  '@turf/line-split@7.3.2':
+    resolution: {integrity: sha512-AvOa7+nr+xZFjMzGDNgbCvhILGeD4Tm1kBLGs6wznl9Rs4XeTKmMLIsTa7ggZJcjBs1BBIjjbBW+4UicZQF6Nw==}
+
+  '@turf/meta@7.3.2':
+    resolution: {integrity: sha512-FIcIY+ZsAe9QV4fHciTXeuRz2TKIVaEjivkl4vMFCibdj7FUkWDofqOncbIre1xPrgktQeh20ZrmD+p0kf3n4Q==}
+
+  '@turf/midpoint@7.3.2':
+    resolution: {integrity: sha512-ZyJZ/qR7yA7+jmzcP7T7xH2B3vDu1MhnfDLk1CSr7S/oh5fA3GKCfcaJtyURu8H3e+JF66ZDMRkhR1aNK7li/A==}
+
+  '@turf/nearest-point-on-line@7.3.2':
+    resolution: {integrity: sha512-IfI7SkasMLdULb+gPOtdZtTSTkuS06dlKEUX4lPOC94jJA2vjaCDIRxejRRzGLY0EQ4uben9I8PQEp7cwVuERA==}
+
+  '@turf/nearest-point@7.3.2':
+    resolution: {integrity: sha512-+uMmQVYldH/g8WL4B7k2UtZ7AwSO5IMpt56dLxd/e2dvyFL/dPcoR4gJQP/aBQ/NkjmGw5LDAjePk4vAunO34A==}
+
+  '@turf/polygon-to-line@7.3.2':
+    resolution: {integrity: sha512-/C8On+ddnMi1z2r5ZLbGyXb+gCM4d4CpAKx3f80kyReM2IxwN6F0t6y1PPXYx4eR2P49fhiEcQJ9m0kCwQBAzw==}
+
+  '@turf/projection@7.3.2':
+    resolution: {integrity: sha512-9DQRW2aqcfa0RoeFmkkhP6FgLZzc94owa2no6ORvvY4uOXFArOWYuDQWIAmPpHrnMJ2MbwiRsRkduyaVEuUcpw==}
+
+  '@turf/simplify@7.3.2':
+    resolution: {integrity: sha512-SclJBS2S/0fn7EiWr/vHzXcvj3JmfMbqjx2ITPEKALOvsOm6sufMJeA/PoAh2Mj3QMKTfxrWw8RKVxP/ZHc+zQ==}
+
+  '@turf/truncate@7.3.2':
+    resolution: {integrity: sha512-JXbezhuzBCWpgIAVhndV3cAdXR2CYXhlOC48bOO4Kf944YQUXO9VGELdIP5ygpsCaOpebTKf8f7wHQziO5hBNQ==}
+
+  '@turf/union@7.3.2':
+    resolution: {integrity: sha512-farmJGdWwaof5m0NHRR0PZ23WyMAIbFuofePQ+BJmJchJTwEV2Ez2zKqPl2q5ZXaYhVNCWo+bYN2umOBIFjDig==}
+
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
 
@@ -1731,6 +1898,9 @@ packages:
 
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
+
+  '@types/geojson@7946.0.16':
+    resolution: {integrity: sha512-6C8nqWur3j98U6+lXDfTUWIfgvZU+EumvpHKcYjujKH7woYyLj2sUmff0tRhrqM7BohUw7Pz3ZB1jj2gW9Fvmg==}
 
   '@types/hast@3.0.4':
     resolution: {integrity: sha512-WPs+bbQw5aCj+x6laNGWLH3wviHtoCv/P3+otBhbOhJgG8qtpdAMlTCxLtsTWA7LH1Oh/bFCHsBn0TPS5m30EQ==}
@@ -2424,6 +2594,9 @@ packages:
   capnweb@0.2.0:
     resolution: {integrity: sha512-fQSW5h6HIefRM4rHZMyAsWcu/qE/6Qr2OC8B99whifjDJatI5KLFcODSykKmpyCCKF50N3HvZ5lB26YBdh0fRg==}
 
+  capnweb@0.4.0:
+    resolution: {integrity: sha512-OgqPQcxnrAIqjrkAuwI4N9MP/mzseM5w9oLWb/oU63KveBJl1c8p41etLSVQUlYFiAYZu+h6/LJxKaDJd93xFw==}
+
   ccount@2.0.1:
     resolution: {integrity: sha512-eyrF0jiFpY+3drT6383f1qhkbGsLSifNAjA61IUjZjmLCWjItY6LB9ft9YhoDgwfmclB2zhu51Lc7+95b8NRAg==}
 
@@ -2570,6 +2743,9 @@ packages:
     resolution: {integrity: sha512-jaSIDzP9pZVS4ZfQ+TzvtiWhdpFhE2RDHz8QJkpX9SIpLq88VueF5jJw6t+6CUQcAoA6t+x89MLrWAqpfDE8iQ==}
     engines: {node: '>= 0.8.0'}
 
+  concaveman@1.2.1:
+    resolution: {integrity: sha512-PwZYKaM/ckQSa8peP5JpVr7IMJ4Nn/MHIaWUjP4be+KoZ7Botgs8seAZGpmaOM+UZXawcdYRao/px9ycrCihHw==}
+
   conf@10.2.0:
     resolution: {integrity: sha512-8fLl9F04EJqjSqH+QjITQfJF8BrOVaYr1jewVgSRAEWePfxT0sku4w2hrGQ60BC/TNLGQ2pgxNlTbWQmMPFvXg==}
     engines: {node: '>=12'}
@@ -2640,6 +2816,12 @@ packages:
 
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
+
+  d3-array@1.2.4:
+    resolution: {integrity: sha512-KHW6M86R+FUPYGb3R5XiYjXPq7VzwxZ22buHhAEVG5ztoEcZZMLov530mmccaqA1GghZArjQV46fuc8kUqhhHw==}
+
+  d3-geo@1.7.1:
+    resolution: {integrity: sha512-O4AempWAr+P5qbk2bC2FuN/sDW4z+dN2wDf9QV3bxQt4M5HfOEeXLgJ/UKQW0+o1Dj8BE+L5kiDbdWUMjsmQpw==}
 
   d@1.0.2:
     resolution: {integrity: sha512-MOqHvMWF9/9MX6nza0KgvFH4HpMU0EF5uUDXqX/BtxtU8NfB0QzRtJ8Oe/6SuS4kbhyzVJwjd97EA4PKrzJ8bw==}
@@ -3214,6 +3396,9 @@ packages:
     resolution: {integrity: sha512-a4tiq7E0/5fTjxPAaH4jpjkSv/uCaU2p5KC6HVGrvl0cDjA8iBZv4vv1gyzlmK0ZUKqwpOyQMKzZQe3lTit77A==}
     engines: {node: '>=14'}
 
+  geojson-equality-ts@1.0.2:
+    resolution: {integrity: sha512-h3Ryq+0mCSN/7yLs0eDgrZhvc9af23o/QuC4aTiuuzP/MRCtd6mf5rLsLRY44jX0RPUfM8c4GqERQmlUxPGPoQ==}
+
   get-func-name@2.0.2:
     resolution: {integrity: sha512-8vXOvuE167CtIc3OyItco7N/dpRtBbYOsPsXCz7X/PMnlGjYjSGuZJgM1Y7mmew7BKf9BqvLX2tnOVy1BBUsxQ==}
 
@@ -3710,6 +3895,10 @@ packages:
     resolution: {integrity: sha512-PRp66vJ865SSqOlgqS8hujT5U4AOgMfhrwYIuIhfKaoSCZcirrmASQr8CX7cUg+RMih+hgznrjp99o+W4pJLHQ==}
     engines: {node: '>=12', npm: '>=6'}
 
+  jsts@2.7.1:
+    resolution: {integrity: sha512-x2wSZHEBK20CY+Wy+BPE7MrFQHW6sIsdaGUMEqmGAio+3gFzQaBYPwLRonUfQf9Ak8pBieqj9tUofX1+WtAEIg==}
+    engines: {node: '>= 12'}
+
   jwa@1.4.2:
     resolution: {integrity: sha512-eeH5JO+21J78qMvTIDdBXidBd6nG2kZjg5Ohz/1fpa28Z4CcsWUzJ1ZZyFq/3z3N17aZy+ZuBoHljASbL1WfOw==}
 
@@ -3944,6 +4133,9 @@ packages:
   methods@1.1.2:
     resolution: {integrity: sha512-iclAHeNqNm68zFtnZ0e+1L2yUIdvzNoauKU4WBA3VvH/vPFieF7qfRlwUZU+DA9P9bPXIS90ulxoUoCH23sV2w==}
     engines: {node: '>= 0.6'}
+
+  mgrs@1.0.0:
+    resolution: {integrity: sha512-awNbTOqCxK1DBGjalK3xqWIstBZgN6fxsMSiXLs9/spqWkF2pAhb2rrYCFSsr1/tT7PhcDGjZndG8SWYn0byYA==}
 
   micromark-core-commonmark@2.0.3:
     resolution: {integrity: sha512-RDBrHEMSxVFLg6xvnXmb1Ayr2WzLAWjeSATAoxwKYJV94TeNavgoIdA0a9ytzDSVzBy2YKFK+emCPOEibLeCrg==}
@@ -4554,6 +4746,15 @@ packages:
     resolution: {integrity: sha512-Nc3IT5yHzflTfbjgqWcCPpo7DaKy4FnpB0l/zCAW0Tc7jxAiuqSxHasntB3D7887LSrA93kDJ9IXovxJYxyLCA==}
     engines: {node: '>=4'}
 
+  point-in-polygon-hao@1.2.4:
+    resolution: {integrity: sha512-x2pcvXeqhRHlNRdhLs/tgFapAbSSe86wa/eqmj1G6pWftbEs5aVRJhRGM6FYSUERKu0PjekJzMq0gsI2XyiclQ==}
+
+  point-in-polygon@1.1.0:
+    resolution: {integrity: sha512-3ojrFwjnnw8Q9242TzgXuTD+eKiutbzyslcq1ydfu82Db2y+Ogbmyrkpv0Hgj31qwT3lbS9+QAAO/pIQM35XRw==}
+
+  polyclip-ts@0.16.8:
+    resolution: {integrity: sha512-JPtKbDRuPEuAjuTdhR62Gph7Is2BS1Szx69CFOO3g71lpJDFo78k4tFyi+qFOMVPePEzdSKkpGU3NBXPHHjvKQ==}
+
   possible-typed-array-names@1.1.0:
     resolution: {integrity: sha512-/+5VFTchJDoVj3bhoqi6UeymcD00DAwb1nJwamzPvHEszJ4FpF6SNNbUbOS8yI56qHzdV8eK0qEfOSiodkTdxg==}
     engines: {node: '>= 0.4'}
@@ -4565,6 +4766,21 @@ packages:
   postcss@8.5.6:
     resolution: {integrity: sha512-3Ybi1tAuwAP9s0r1UQ2J4n5Y0G05bJkpUIO0/bI9MhwmD70S5aTWbXGBwxHrelT+XM1k6dM0pk+SwNkpTRN7Pg==}
     engines: {node: ^10 || ^12 || >=14}
+
+  postgres.do@0.1.0:
+    resolution: {integrity: sha512-HxDRXA0SYVj1xE9MSxLAX3Quv7iJQqA9CinWPiUrk4gQPN/kcS3fKJcHHf3S1zEruFRu2tAtgBISu61cOfnplA==}
+    hasBin: true
+    peerDependencies:
+      '@dotdo/pglite': ^0.1.0
+      '@dotdo/postgres': ^0.1.0
+      drizzle-orm: '>=0.30.0'
+    peerDependenciesMeta:
+      '@dotdo/pglite':
+        optional: true
+      '@dotdo/postgres':
+        optional: true
+      drizzle-orm:
+        optional: true
 
   prebuild-install@7.1.3:
     resolution: {integrity: sha512-8Mf2cbV7x1cXPUILADGI3wuhfqWvtiLA1iclTDbFRZkgRQS0NqsPZphna9V+HyTEadheuPmjaJMsbzKQFOzLug==}
@@ -4595,6 +4811,9 @@ packages:
   process@0.11.10:
     resolution: {integrity: sha512-cdGef/drWFoydD1JsMzuFf8100nZl+GT+yacc2bEced5f9Rjk4z+WtFUTBu9PhOi9j/jfmBPu0mMEY4wIdAF8A==}
     engines: {node: '>= 0.6.0'}
+
+  proj4@2.20.2:
+    resolution: {integrity: sha512-ipfBRfQly0HhHTO7hnC1GfaX8bvroO7VV4KH889ehmADSE8C/qzp2j+Jj6783S9Tj6c2qX/hhYm7oH0kgXzBAA==}
 
   projects.do@0.0.1:
     resolution: {integrity: sha512-SOvXDoZyIJhxoUkwbrzwizxq/EAgbQTkFBsP2GHY1mLzW5/8bw4W/uOzNWuwMegBp/pCy+JtH7DVFDZP+djREQ==}
@@ -4642,6 +4861,12 @@ packages:
     resolution: {integrity: sha512-AAFUA5O1d83pIHEhJwWCq/RQcRukCkn/NSm2QsTEMle5f2hP0ChI2+3Xb051PZCkLryI/Ir1MVKviT2FIloaTQ==}
     engines: {node: '>=12'}
 
+  quickselect@2.0.0:
+    resolution: {integrity: sha512-RKJ22hX8mHe3Y6wH/N3wCM6BWtjaxIyyUIkpHOvfFnxdI4yD4tBXEBKSbriGujF6jnSVkJrffuo6vxACiSSxIw==}
+
+  quickselect@3.0.0:
+    resolution: {integrity: sha512-XdjUArbK4Bm5fLLvlm5KpTFOiOThgfWWI4axAZDWg4E/0mKdZyI9tNEfds27qCi1ze/vwTR16kvmmGhRra3c2g==}
+
   randombytes@2.1.0:
     resolution: {integrity: sha512-vYl3iOX+4CKUWuxGi9Ukhie6fsqXqS9FE2Zaic4tNFD2N2QQaXOMFbuKK4QmDHC0JO6B1Zp41J0LpT0oR68amQ==}
 
@@ -4652,6 +4877,12 @@ packages:
   raw-body@2.5.2:
     resolution: {integrity: sha512-8zGqypfENjCIqGhgXToC8aB2r7YrBX+AQAfIPs/Mlk+BtPTztOvTS01NRW/3Eh60J+a48lt8qsCzirQ6loCVfA==}
     engines: {node: '>= 0.8'}
+
+  rbush@3.0.1:
+    resolution: {integrity: sha512-XRaVO0YecOpEuIvbhbpTrZgoiI6xBlz6hnlr6EHhd+0x9ase6EmeN+hdwwUaJvLcsFFQ8iWVF1GAK1yB0BWi0w==}
+
+  rbush@4.0.1:
+    resolution: {integrity: sha512-IP0UpfeWQujYC8Jg162rMNc01Rf0gWMMAb2Uxus/Q0qOFw4lCcq6ZnQEZwUoJqWyUGJ9th7JjwI4yIWo+uvoAQ==}
 
   rc@1.2.8:
     resolution: {integrity: sha512-y3bGgqKj3QBdxLbLkomlohkvsA8gdAiUQlSBJnBhfn+BPxg4bc62d8TcBW15wavDfgexCgccckhcZvywyQYPOw==}
@@ -4849,6 +5080,12 @@ packages:
     resolution: {integrity: sha512-RfqAvLnMl313r7c9oclB1HhUEAezcpLjz95wFH4LVuhk9JF/r22qmVP9AMmOU4vMX7Q8pN8jwNg/CSpdFnMjTQ==}
     engines: {node: '>= 0.4'}
     hasBin: true
+
+  robust-predicates@2.0.4:
+    resolution: {integrity: sha512-l4NwboJM74Ilm4VKfbAtFeGq7aEjWL+5kVFcmgFA2MrdnQWx9iE/tUGvxY5HyMI7o/WpSIUFLbC5fbeaHgSCYg==}
+
+  robust-predicates@3.0.2:
+    resolution: {integrity: sha512-IXgzBWvWQwE6PrDI05OvmXUIruQTcoMDzRsOd5CDvHCVLcLHMTSYvOK5Cm46kWqlV3yAbuSpBZdJ5oP5OUoStg==}
 
   rollup@4.56.0:
     resolution: {integrity: sha512-9FwVqlgUHzbXtDg9RCMgodF3Ua4Na6Gau+Sdt9vyCN4RhHfVKX2DCHy3BjMLTDd47ITDhYAnTwGulWTblJSDLg==}
@@ -5054,6 +5291,9 @@ packages:
   space-separated-tokens@2.0.2:
     resolution: {integrity: sha512-PEGlAwrG8yXGXRjW32fGbg66JAlOAwbObuqVoJpv/mRgoWDQfgH1wDPvtzWyUSNAXBGSk8h755YDbbcEy3SH2Q==}
 
+  splaytree-ts@1.0.2:
+    resolution: {integrity: sha512-0kGecIZNIReCSiznK3uheYB8sbstLjCZLiwcQwbmLhgHJj2gz6OnSPkVzJQCMnmEz1BQ4gPK59ylhBoEWOhGNA==}
+
   split2@4.2.0:
     resolution: {integrity: sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg==}
     engines: {node: '>= 10.x'}
@@ -5193,6 +5433,9 @@ packages:
       '@swc/core': ^1.2.147
       webpack: '>=2'
 
+  sweepline-intersections@1.5.0:
+    resolution: {integrity: sha512-AoVmx72QHpKtItPu72TzFL+kcYjd67BPLDoR0LarIk+xyaRg+pDTMFXndIEvZf9xEKnJv6JdhgRMnocoG0D3AQ==}
+
   swr-store@0.10.6:
     resolution: {integrity: sha512-xPjB1hARSiRaNNlUQvWSVrG5SirCjk2TmaUyzzvk69SZQan9hCJqw/5rG9iL7xElHU784GxRPISClq4488/XVw==}
     engines: {node: '>=10'}
@@ -5329,6 +5572,9 @@ packages:
   tinypool@1.1.1:
     resolution: {integrity: sha512-Zba82s87IFq9A9XmjiX5uZA/ARWDrB03OHlq+Vw1fSdt0I+4/Kutwy8BP4Y/y/aORMo61FQ0vIb5j44vSo5Pkg==}
     engines: {node: ^18.0.0 || >=20.0.0}
+
+  tinyqueue@2.0.3:
+    resolution: {integrity: sha512-ppJZNDuKGgxzkHihX8v9v9G5f+18gzaTfrukGrq6ueg0lmH4nqVnA2IPG0AEH3jKEk2GRJCUhDoqpoiw3PHLBA==}
 
   tinyrainbow@2.0.0:
     resolution: {integrity: sha512-op4nsTR47R6p0vMUUoYl/a+ljLFVtlfaXkLQmqfLR1qHma1h/ysYk4hEXZ880bf2CYgTskvTa/e196Vd5dDQXw==}
@@ -5743,6 +5989,9 @@ packages:
     resolution: {integrity: sha512-hUrmaWBdVDcxvYqnyh09zunKzROWjbZTiNy8dBEjkS7ehEDQibXJ7XvlmtbwuTclUiIyN+CyXQD4Vmko8fNm8w==}
     engines: {node: '>=8'}
     hasBin: true
+
+  wkt-parser@1.5.2:
+    resolution: {integrity: sha512-1ZUiV1FTwSiSrgWzV9KXJuOF2BVW91KY/mau04BhnmgOdroRQea7Q0s5TVqwGLm0D2tZwObd/tBYXW49sSxp3Q==}
 
   workerd@1.20250718.0:
     resolution: {integrity: sha512-kqkIJP/eOfDlUyBzU7joBg+tl8aB25gEAGqDap+nFWb+WHhnooxjGHgxPBy3ipw2hnShPFNOQt5lFRxbwALirg==}
@@ -6262,6 +6511,100 @@ snapshots:
     dependencies:
       react: 18.3.1
       tslib: 2.8.1
+
+  '@dotdo/apis@0.1.0(@cloudflare/workers-types@4.20260123.0)(@dotdo/pglite@0.1.0)(@dotdo/postgres@0.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      '@dotdo/documentdb': 0.1.0(@cloudflare/workers-types@4.20260123.0)
+      '@electric-sql/pglite': 0.3.15
+      hono: 4.11.5
+      postgres.do: 0.1.0(@dotdo/pglite@0.1.0)(@dotdo/postgres@0.1.0)(hono@4.11.5)
+    optionalDependencies:
+      oauth.do: 0.2.0(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      rpc.do: 0.2.0(oauth.do@0.2.0(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+    transitivePeerDependencies:
+      - '@cloudflare/workers-types'
+      - '@dotdo/pglite'
+      - '@dotdo/postgres'
+      - '@radix-ui/themes'
+      - '@tanstack/react-query'
+      - '@workos-inc/authkit-react'
+      - '@workos-inc/widgets'
+      - bufferutil
+      - drizzle-orm
+      - jose
+      - react
+      - react-dom
+      - utf-8-validate
+
+  '@dotdo/documentdb@0.1.0(@cloudflare/workers-types@4.20260123.0)':
+    dependencies:
+      '@dotdo/pg-geo': 0.1.0(@cloudflare/workers-types@4.20260123.0)
+      '@dotdo/postgres': 0.1.0
+      '@dotdo/postgres-shared': 0.1.0(hono@4.11.5)
+      ai-evaluate: 2.1.5
+      capnweb: 0.4.0
+      hono: 4.11.5
+    transitivePeerDependencies:
+      - '@cloudflare/workers-types'
+      - bufferutil
+      - drizzle-orm
+      - utf-8-validate
+
+  '@dotdo/pg-geo@0.1.0(@cloudflare/workers-types@4.20260123.0)':
+    dependencies:
+      '@electric-sql/pglite': 0.2.17
+      '@turf/area': 7.3.2
+      '@turf/bbox': 7.3.2
+      '@turf/bbox-polygon': 7.3.2
+      '@turf/bearing': 7.3.2
+      '@turf/boolean-contains': 7.3.2
+      '@turf/boolean-disjoint': 7.3.2
+      '@turf/boolean-equal': 7.3.2
+      '@turf/boolean-intersects': 7.3.2
+      '@turf/boolean-overlap': 7.3.2
+      '@turf/boolean-within': 7.3.2
+      '@turf/buffer': 7.3.2
+      '@turf/center-of-mass': 7.3.2
+      '@turf/centroid': 7.3.2
+      '@turf/circle': 7.3.2
+      '@turf/convex': 7.3.2
+      '@turf/destination': 7.3.2
+      '@turf/difference': 7.3.2
+      '@turf/distance': 7.3.2
+      '@turf/helpers': 7.3.2
+      '@turf/intersect': 7.3.2
+      '@turf/kinks': 7.3.2
+      '@turf/length': 7.3.2
+      '@turf/midpoint': 7.3.2
+      '@turf/nearest-point': 7.3.2
+      '@turf/simplify': 7.3.2
+      '@turf/union': 7.3.2
+      capnweb: 0.1.0
+      hono: 4.11.5
+      proj4: 2.20.2
+      rbush: 4.0.1
+    optionalDependencies:
+      '@cloudflare/workers-types': 4.20260123.0
+
+  '@dotdo/pglite@0.1.0': {}
+
+  '@dotdo/postgres-shared@0.1.0(hono@4.11.5)':
+    optionalDependencies:
+      hono: 4.11.5
+
+  '@dotdo/postgres@0.1.0':
+    dependencies:
+      '@dotdo/pglite': 0.1.0
+      '@dotdo/postgres-shared': 0.1.0(hono@4.11.5)
+      capnweb: 0.4.0
+      hono: 4.11.5
+      postgres.do: 0.1.0(@dotdo/pglite@0.1.0)(@dotdo/postgres@0.1.0)(hono@4.11.5)
+    transitivePeerDependencies:
+      - drizzle-orm
+
+  '@electric-sql/pglite@0.2.17': {}
+
+  '@electric-sql/pglite@0.3.15': {}
 
   '@emnapi/runtime@1.8.1':
     dependencies:
@@ -6922,14 +7265,14 @@ snapshots:
 
   '@jsdevtools/ono@7.1.3': {}
 
-  '@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))':
+  '@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))':
     dependencies:
       '@cfworker/json-schema': 4.1.1
       ansi-styles: 5.2.0
       camelcase: 6.3.0
       decamelize: 1.2.0
       js-tiktoken: 1.0.21
-      langsmith: 0.4.8(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))
+      langsmith: 0.4.8(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))
       mustache: 4.2.0
       p-queue: 6.6.2
       uuid: 10.0.0
@@ -6940,26 +7283,26 @@ snapshots:
       - '@opentelemetry/sdk-trace-base'
       - openai
 
-  '@langchain/langgraph-checkpoint@1.0.0(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))':
+  '@langchain/langgraph-checkpoint@1.0.0(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))':
     dependencies:
-      '@langchain/core': 1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))
+      '@langchain/core': 1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))
       uuid: 10.0.0
 
-  '@langchain/langgraph-sdk@1.5.5(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@langchain/langgraph-sdk@1.5.5(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       p-queue: 9.1.0
       p-retry: 7.1.1
       uuid: 13.0.0
     optionalDependencies:
-      '@langchain/core': 1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))
+      '@langchain/core': 1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
 
-  '@langchain/langgraph@1.1.2(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6))(zod@4.3.6)':
+  '@langchain/langgraph@1.1.2(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6))(zod@4.3.6)':
     dependencies:
-      '@langchain/core': 1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))
-      '@langchain/langgraph-checkpoint': 1.0.0(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))
-      '@langchain/langgraph-sdk': 1.5.5(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@langchain/core': 1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))
+      '@langchain/langgraph-checkpoint': 1.0.0(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))
+      '@langchain/langgraph-sdk': 1.5.5(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@standard-schema/spec': 1.1.0
       uuid: 10.0.0
       zod: 4.3.6
@@ -6969,9 +7312,9 @@ snapshots:
       - react
       - react-dom
 
-  '@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0)':
+  '@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0)':
     dependencies:
-      '@langchain/core': 1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))
+      '@langchain/core': 1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))
       js-tiktoken: 1.0.21
       openai: 6.16.0(ws@8.18.0)(zod@4.3.6)
       zod: 4.3.6
@@ -7278,6 +7621,354 @@ snapshots:
 
   '@tokenizer/token@0.3.0': {}
 
+  '@turf/area@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@turf/meta': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/bbox-polygon@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/bbox@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@turf/meta': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/bearing@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@turf/invariant': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/boolean-contains@7.3.2':
+    dependencies:
+      '@turf/bbox': 7.3.2
+      '@turf/boolean-point-in-polygon': 7.3.2
+      '@turf/boolean-point-on-line': 7.3.2
+      '@turf/helpers': 7.3.2
+      '@turf/invariant': 7.3.2
+      '@turf/line-split': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/boolean-disjoint@7.3.2':
+    dependencies:
+      '@turf/boolean-point-in-polygon': 7.3.2
+      '@turf/helpers': 7.3.2
+      '@turf/line-intersect': 7.3.2
+      '@turf/meta': 7.3.2
+      '@turf/polygon-to-line': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/boolean-equal@7.3.2':
+    dependencies:
+      '@turf/clean-coords': 7.3.2
+      '@turf/helpers': 7.3.2
+      '@turf/invariant': 7.3.2
+      '@types/geojson': 7946.0.16
+      geojson-equality-ts: 1.0.2
+      tslib: 2.8.1
+
+  '@turf/boolean-intersects@7.3.2':
+    dependencies:
+      '@turf/boolean-disjoint': 7.3.2
+      '@turf/helpers': 7.3.2
+      '@turf/meta': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/boolean-overlap@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@turf/invariant': 7.3.2
+      '@turf/line-intersect': 7.3.2
+      '@turf/line-overlap': 7.3.2
+      '@turf/meta': 7.3.2
+      '@types/geojson': 7946.0.16
+      geojson-equality-ts: 1.0.2
+      tslib: 2.8.1
+
+  '@turf/boolean-point-in-polygon@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@turf/invariant': 7.3.2
+      '@types/geojson': 7946.0.16
+      point-in-polygon-hao: 1.2.4
+      tslib: 2.8.1
+
+  '@turf/boolean-point-on-line@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@turf/invariant': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/boolean-within@7.3.2':
+    dependencies:
+      '@turf/bbox': 7.3.2
+      '@turf/boolean-point-in-polygon': 7.3.2
+      '@turf/boolean-point-on-line': 7.3.2
+      '@turf/helpers': 7.3.2
+      '@turf/invariant': 7.3.2
+      '@turf/line-split': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/buffer@7.3.2':
+    dependencies:
+      '@turf/bbox': 7.3.2
+      '@turf/center': 7.3.2
+      '@turf/helpers': 7.3.2
+      '@turf/jsts': 2.7.2
+      '@turf/meta': 7.3.2
+      '@turf/projection': 7.3.2
+      '@types/geojson': 7946.0.16
+      d3-geo: 1.7.1
+
+  '@turf/center-of-mass@7.3.2':
+    dependencies:
+      '@turf/centroid': 7.3.2
+      '@turf/convex': 7.3.2
+      '@turf/helpers': 7.3.2
+      '@turf/invariant': 7.3.2
+      '@turf/meta': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/center@7.3.2':
+    dependencies:
+      '@turf/bbox': 7.3.2
+      '@turf/helpers': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/centroid@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@turf/meta': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/circle@7.3.2':
+    dependencies:
+      '@turf/destination': 7.3.2
+      '@turf/helpers': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/clean-coords@7.3.2':
+    dependencies:
+      '@turf/boolean-point-on-line': 7.3.2
+      '@turf/helpers': 7.3.2
+      '@turf/invariant': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/clone@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/convex@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@turf/meta': 7.3.2
+      '@types/geojson': 7946.0.16
+      concaveman: 1.2.1
+      tslib: 2.8.1
+
+  '@turf/destination@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@turf/invariant': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/difference@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@turf/meta': 7.3.2
+      '@types/geojson': 7946.0.16
+      polyclip-ts: 0.16.8
+      tslib: 2.8.1
+
+  '@turf/distance@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@turf/invariant': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/geojson-rbush@7.3.2':
+    dependencies:
+      '@turf/bbox': 7.3.2
+      '@turf/helpers': 7.3.2
+      '@turf/meta': 7.3.2
+      '@types/geojson': 7946.0.16
+      rbush: 3.0.1
+      tslib: 2.8.1
+
+  '@turf/helpers@7.3.2':
+    dependencies:
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/intersect@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@turf/meta': 7.3.2
+      '@types/geojson': 7946.0.16
+      polyclip-ts: 0.16.8
+      tslib: 2.8.1
+
+  '@turf/invariant@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/jsts@2.7.2':
+    dependencies:
+      jsts: 2.7.1
+
+  '@turf/kinks@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/length@7.3.2':
+    dependencies:
+      '@turf/distance': 7.3.2
+      '@turf/helpers': 7.3.2
+      '@turf/meta': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/line-intersect@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@types/geojson': 7946.0.16
+      sweepline-intersections: 1.5.0
+      tslib: 2.8.1
+
+  '@turf/line-overlap@7.3.2':
+    dependencies:
+      '@turf/boolean-point-on-line': 7.3.2
+      '@turf/geojson-rbush': 7.3.2
+      '@turf/helpers': 7.3.2
+      '@turf/invariant': 7.3.2
+      '@turf/line-segment': 7.3.2
+      '@turf/meta': 7.3.2
+      '@turf/nearest-point-on-line': 7.3.2
+      '@types/geojson': 7946.0.16
+      fast-deep-equal: 3.1.3
+      tslib: 2.8.1
+
+  '@turf/line-segment@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@turf/invariant': 7.3.2
+      '@turf/meta': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/line-split@7.3.2':
+    dependencies:
+      '@turf/bbox': 7.3.2
+      '@turf/geojson-rbush': 7.3.2
+      '@turf/helpers': 7.3.2
+      '@turf/invariant': 7.3.2
+      '@turf/line-intersect': 7.3.2
+      '@turf/line-segment': 7.3.2
+      '@turf/meta': 7.3.2
+      '@turf/nearest-point-on-line': 7.3.2
+      '@turf/truncate': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/meta@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/midpoint@7.3.2':
+    dependencies:
+      '@turf/bearing': 7.3.2
+      '@turf/destination': 7.3.2
+      '@turf/distance': 7.3.2
+      '@turf/helpers': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/nearest-point-on-line@7.3.2':
+    dependencies:
+      '@turf/distance': 7.3.2
+      '@turf/helpers': 7.3.2
+      '@turf/invariant': 7.3.2
+      '@turf/meta': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/nearest-point@7.3.2':
+    dependencies:
+      '@turf/clone': 7.3.2
+      '@turf/distance': 7.3.2
+      '@turf/helpers': 7.3.2
+      '@turf/meta': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/polygon-to-line@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@turf/invariant': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/projection@7.3.2':
+    dependencies:
+      '@turf/clone': 7.3.2
+      '@turf/helpers': 7.3.2
+      '@turf/meta': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/simplify@7.3.2':
+    dependencies:
+      '@turf/clean-coords': 7.3.2
+      '@turf/clone': 7.3.2
+      '@turf/helpers': 7.3.2
+      '@turf/meta': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/truncate@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@turf/meta': 7.3.2
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/union@7.3.2':
+    dependencies:
+      '@turf/helpers': 7.3.2
+      '@turf/meta': 7.3.2
+      '@types/geojson': 7946.0.16
+      polyclip-ts: 0.16.8
+      tslib: 2.8.1
+
   '@types/chai@5.2.3':
     dependencies:
       '@types/deep-eql': 4.0.2
@@ -7306,6 +7997,8 @@ snapshots:
       '@types/estree': 1.0.8
 
   '@types/estree@1.0.8': {}
+
+  '@types/geojson@7946.0.16': {}
 
   '@types/hast@3.0.4':
     dependencies:
@@ -7638,11 +8331,11 @@ snapshots:
     dependencies:
       humanize-ms: 1.2.1
 
-  ai-brand@0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@swc/helpers@0.5.15)(@types/debug@4.1.12)(@types/react@18.3.27)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(solid-js@1.9.11)(svelte@4.2.20)(terser@5.46.0)(typescript@5.9.3)(vue@3.5.27(typescript@5.9.3))(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))(yaml@2.8.2):
+  ai-brand@0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@swc/helpers@0.5.15)(@types/debug@4.1.12)(@types/react@18.3.27)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(solid-js@1.9.11)(svelte@4.2.20)(terser@5.46.0)(typescript@5.9.3)(vue@3.5.27(typescript@5.9.3))(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))(yaml@2.8.2):
     dependencies:
       ai: 2.2.37(react@18.3.1)(solid-js@1.9.11)(svelte@4.2.20)(vue@3.5.27(typescript@5.9.3))
-      ai-business: 0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@swc/helpers@0.5.15)(@types/debug@4.1.12)(@types/react@18.3.27)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))(yaml@2.8.2)
-      ai-providers: 0.2.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@types/debug@4.1.12)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(yaml@2.8.2)(zod@3.25.76)
+      ai-business: 0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@swc/helpers@0.5.15)(@types/debug@4.1.12)(@types/react@18.3.27)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))(yaml@2.8.2)
+      ai-providers: 0.2.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@types/debug@4.1.12)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(yaml@2.8.2)(zod@3.25.76)
       zod: 3.25.76
     transitivePeerDependencies:
       - '@cloudflare/workers-types'
@@ -7685,9 +8378,9 @@ snapshots:
       - webpack
       - yaml
 
-  ai-business@0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@swc/helpers@0.5.15)(@types/debug@4.1.12)(@types/react@18.3.27)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))(yaml@2.8.2):
+  ai-business@0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@swc/helpers@0.5.15)(@types/debug@4.1.12)(@types/react@18.3.27)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))(yaml@2.8.2):
     dependencies:
-      ai-providers: 0.2.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@types/debug@4.1.12)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(yaml@2.8.2)(zod@3.25.76)
+      ai-providers: 0.2.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@types/debug@4.1.12)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(yaml@2.8.2)(zod@3.25.76)
       payload: 2.32.3(@swc/helpers@0.5.15)(@types/react@18.3.27)(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))
       zod: 3.25.76
     transitivePeerDependencies:
@@ -7834,21 +8527,21 @@ snapshots:
 
   ai-plans@0.1.0: {}
 
-  ai-primitives@0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@opentelemetry/api@1.9.0)(@swc/helpers@0.5.15)(@types/debug@4.1.12)(@types/node@22.19.7)(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(solid-js@1.9.11)(svelte@4.2.20)(terser@5.46.0)(typescript@5.9.3)(vue@3.5.27(typescript@5.9.3))(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))(ws@8.18.0)(yaml@2.8.2)(zod@4.3.6):
+  ai-primitives@0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@opentelemetry/api@1.9.0)(@swc/helpers@0.5.15)(@types/debug@4.1.12)(@types/node@22.19.7)(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(solid-js@1.9.11)(svelte@4.2.20)(terser@5.46.0)(typescript@5.9.3)(vue@3.5.27(typescript@5.9.3))(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))(ws@8.18.0)(yaml@2.8.2)(zod@4.3.6):
     dependencies:
-      ai-brand: 0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@swc/helpers@0.5.15)(@types/debug@4.1.12)(@types/react@18.3.27)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(solid-js@1.9.11)(svelte@4.2.20)(terser@5.46.0)(typescript@5.9.3)(vue@3.5.27(typescript@5.9.3))(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))(yaml@2.8.2)
-      ai-business: 0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@swc/helpers@0.5.15)(@types/debug@4.1.12)(@types/react@18.3.27)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))(yaml@2.8.2)
+      ai-brand: 0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@swc/helpers@0.5.15)(@types/debug@4.1.12)(@types/react@18.3.27)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(solid-js@1.9.11)(svelte@4.2.20)(terser@5.46.0)(typescript@5.9.3)(vue@3.5.27(typescript@5.9.3))(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))(yaml@2.8.2)
+      ai-business: 0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@swc/helpers@0.5.15)(@types/debug@4.1.12)(@types/react@18.3.27)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))(yaml@2.8.2)
       ai-database: 0.1.0
       ai-directory: 0.1.0(@opentelemetry/api@1.9.0)(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)
       ai-experiments: 0.1.0(@types/node@22.19.7)(terser@5.46.0)
       ai-functions: 0.1.0(ws@8.18.0)(zod@4.3.6)
       ai-plans: 0.1.0
       ai-props: 0.1.0(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod@4.3.6)
-      ai-providers: 0.2.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@types/debug@4.1.12)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(yaml@2.8.2)(zod@4.3.6)
-      ai-screenshot: 0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@types/debug@4.1.12)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(ws@8.18.0)(yaml@2.8.2)
+      ai-providers: 0.2.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@types/debug@4.1.12)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(yaml@2.8.2)(zod@4.3.6)
+      ai-screenshot: 0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@types/debug@4.1.12)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(ws@8.18.0)(yaml@2.8.2)
       ai-service: 0.1.0(react@18.3.1)(ws@8.18.0)
       ai-site: 0.1.0(@opentelemetry/api@1.9.0)(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(zod@4.3.6)
-      ai-startups: 0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@swc/helpers@0.5.15)(@types/debug@4.1.12)(@types/react@18.3.27)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))(ws@8.18.0)(yaml@2.8.2)
+      ai-startups: 0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@swc/helpers@0.5.15)(@types/debug@4.1.12)(@types/react@18.3.27)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))(ws@8.18.0)(yaml@2.8.2)
       ai-workflows: 0.1.0(react@18.3.1)
       react: 18.3.1
     transitivePeerDependencies:
@@ -7940,14 +8633,14 @@ snapshots:
     transitivePeerDependencies:
       - zod
 
-  ai-providers@0.2.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@types/debug@4.1.12)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(yaml@2.8.2)(zod@3.25.76):
+  ai-providers@0.2.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@types/debug@4.1.12)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(yaml@2.8.2)(zod@3.25.76):
     dependencies:
       '@ai-sdk/anthropic': 1.2.12(zod@3.25.76)
       '@ai-sdk/google': 1.2.22(zod@3.25.76)
       '@ai-sdk/google-vertex': 2.2.27(zod@3.25.76)
       '@ai-sdk/openai': 1.3.24(zod@3.25.76)
       ai: 4.3.19(react@18.3.1)(zod@3.25.76)
-      composio-core: 0.5.39(@ai-sdk/openai@1.3.24(zod@4.3.6))(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(ai@4.3.19(react@18.3.1)(zod@3.25.76))(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6))
+      composio-core: 0.5.39(@ai-sdk/openai@1.3.24(zod@4.3.6))(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(ai@4.3.19(react@18.3.1)(zod@3.25.76))(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6))
       language-models: 0.1.0(@types/debug@4.1.12)(terser@5.46.0)(yaml@2.8.2)
     transitivePeerDependencies:
       - '@cloudflare/workers-types'
@@ -7978,14 +8671,14 @@ snapshots:
       - yaml
       - zod
 
-  ai-providers@0.2.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@types/debug@4.1.12)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(yaml@2.8.2)(zod@4.3.6):
+  ai-providers@0.2.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@types/debug@4.1.12)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(yaml@2.8.2)(zod@4.3.6):
     dependencies:
       '@ai-sdk/anthropic': 1.2.12(zod@4.3.6)
       '@ai-sdk/google': 1.2.22(zod@4.3.6)
       '@ai-sdk/google-vertex': 2.2.27(zod@4.3.6)
       '@ai-sdk/openai': 1.3.24(zod@4.3.6)
       ai: 4.3.19(react@18.3.1)(zod@4.3.6)
-      composio-core: 0.5.39(@ai-sdk/openai@1.3.24(zod@4.3.6))(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(ai@4.3.19(react@18.3.1)(zod@4.3.6))(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6))
+      composio-core: 0.5.39(@ai-sdk/openai@1.3.24(zod@4.3.6))(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(ai@4.3.19(react@18.3.1)(zod@4.3.6))(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6))
       language-models: 0.1.0(@types/debug@4.1.12)(terser@5.46.0)(yaml@2.8.2)
     transitivePeerDependencies:
       - '@cloudflare/workers-types'
@@ -8040,10 +8733,10 @@ snapshots:
     transitivePeerDependencies:
       - zod
 
-  ai-screenshot@0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@types/debug@4.1.12)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(ws@8.18.0)(yaml@2.8.2):
+  ai-screenshot@0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@types/debug@4.1.12)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(ws@8.18.0)(yaml@2.8.2):
     dependencies:
       ai-functions: 0.1.0(ws@8.18.0)(zod@3.25.76)
-      ai-providers: 0.2.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@types/debug@4.1.12)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(yaml@2.8.2)(zod@3.25.76)
+      ai-providers: 0.2.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@types/debug@4.1.12)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(yaml@2.8.2)(zod@3.25.76)
       html-to-image: 1.11.13
       react: 18.3.1
       zod: 3.25.76
@@ -8104,9 +8797,9 @@ snapshots:
       - sass
       - zod
 
-  ai-startups@0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@swc/helpers@0.5.15)(@types/debug@4.1.12)(@types/react@18.3.27)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))(ws@8.18.0)(yaml@2.8.2):
+  ai-startups@0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@swc/helpers@0.5.15)(@types/debug@4.1.12)(@types/react@18.3.27)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))(ws@8.18.0)(yaml@2.8.2):
     dependencies:
-      ai-business: 0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@swc/helpers@0.5.15)(@types/debug@4.1.12)(@types/react@18.3.27)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))(yaml@2.8.2)
+      ai-business: 0.1.0(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(@swc/helpers@0.5.15)(@types/debug@4.1.12)(@types/react@18.3.27)(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react@18.3.1)(terser@5.46.0)(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15)))(yaml@2.8.2)
       ai-service: 0.1.0(react@18.3.1)(ws@8.18.0)
       zod: 3.25.76
     transitivePeerDependencies:
@@ -8462,6 +9155,7 @@ snapshots:
   bundle-name@4.1.0:
     dependencies:
       run-applescript: 7.1.0
+    optional: true
 
   busboy@1.6.0:
     dependencies:
@@ -8510,10 +9204,11 @@ snapshots:
 
   caniuse-lite@1.0.30001766: {}
 
-  capnweb@0.1.0:
-    optional: true
+  capnweb@0.1.0: {}
 
   capnweb@0.2.0: {}
+
+  capnweb@0.4.0: {}
 
   ccount@2.0.1: {}
 
@@ -8642,23 +9337,23 @@ snapshots:
 
   commander@8.3.0: {}
 
-  composio-core@0.5.39(@ai-sdk/openai@1.3.24(zod@4.3.6))(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(ai@4.3.19(react@18.3.1)(zod@3.25.76))(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6)):
+  composio-core@0.5.39(@ai-sdk/openai@1.3.24(zod@4.3.6))(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(ai@4.3.19(react@18.3.1)(zod@3.25.76))(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6)):
     dependencies:
       '@ai-sdk/openai': 1.3.24(zod@4.3.6)
       '@cloudflare/workers-types': 4.20260123.0
       '@composio/mcp': 1.0.3-0
       '@hey-api/client-axios': 0.2.12(axios@1.13.2)
-      '@langchain/core': 1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))
-      '@langchain/openai': 1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0)
+      '@langchain/core': 1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))
+      '@langchain/openai': 1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0)
       ai: 4.3.19(react@18.3.1)(zod@3.25.76)
       axios: 1.13.2
       chalk: 4.1.2
       cli-progress: 3.12.0
       commander: 12.1.0
       inquirer: 10.2.2
-      langchain: 1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6))
+      langchain: 1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6))
       open: 8.4.2
-      openai: 4.104.0(ws@8.18.0)(zod@4.3.6)
+      openai: 6.16.0(ws@8.18.0)(zod@4.3.6)
       pusher-js: 8.4.0-rc2
       resolve-package-path: 4.0.3
       uuid: 10.0.0
@@ -8667,23 +9362,23 @@ snapshots:
     transitivePeerDependencies:
       - debug
 
-  composio-core@0.5.39(@ai-sdk/openai@1.3.24(zod@4.3.6))(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(ai@4.3.19(react@18.3.1)(zod@4.3.6))(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@4.104.0(ws@8.18.0)(zod@4.3.6)):
+  composio-core@0.5.39(@ai-sdk/openai@1.3.24(zod@4.3.6))(@cloudflare/workers-types@4.20260123.0)(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@langchain/openai@1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0))(ai@4.3.19(react@18.3.1)(zod@4.3.6))(langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)))(openai@6.16.0(ws@8.18.0)(zod@4.3.6)):
     dependencies:
       '@ai-sdk/openai': 1.3.24(zod@4.3.6)
       '@cloudflare/workers-types': 4.20260123.0
       '@composio/mcp': 1.0.3-0
       '@hey-api/client-axios': 0.2.12(axios@1.13.2)
-      '@langchain/core': 1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))
-      '@langchain/openai': 1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0)
+      '@langchain/core': 1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))
+      '@langchain/openai': 1.2.3(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(ws@8.18.0)
       ai: 4.3.19(react@18.3.1)(zod@4.3.6)
       axios: 1.13.2
       chalk: 4.1.2
       cli-progress: 3.12.0
       commander: 12.1.0
       inquirer: 10.2.2
-      langchain: 1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6))
+      langchain: 1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6))
       open: 8.4.2
-      openai: 4.104.0(ws@8.18.0)(zod@4.3.6)
+      openai: 6.16.0(ws@8.18.0)(zod@4.3.6)
       pusher-js: 8.4.0-rc2
       resolve-package-path: 4.0.3
       uuid: 10.0.0
@@ -8707,6 +9402,13 @@ snapshots:
       vary: 1.1.2
     transitivePeerDependencies:
       - supports-color
+
+  concaveman@1.2.1:
+    dependencies:
+      point-in-polygon: 1.1.0
+      rbush: 3.0.1
+      robust-predicates: 2.0.4
+      tinyqueue: 2.0.3
 
   conf@10.2.0:
     dependencies:
@@ -8784,6 +9486,12 @@ snapshots:
   cssfilter@0.0.10: {}
 
   csstype@3.2.3: {}
+
+  d3-array@1.2.4: {}
+
+  d3-geo@1.7.1:
+    dependencies:
+      d3-array: 1.2.4
 
   d@1.0.2:
     dependencies:
@@ -8868,12 +9576,14 @@ snapshots:
 
   deepmerge@4.3.1: {}
 
-  default-browser-id@5.0.1: {}
+  default-browser-id@5.0.1:
+    optional: true
 
   default-browser@5.4.0:
     dependencies:
       bundle-name: 4.1.0
       default-browser-id: 5.0.1
+    optional: true
 
   define-data-property@1.1.4:
     dependencies:
@@ -8883,7 +9593,8 @@ snapshots:
 
   define-lazy-prop@2.0.0: {}
 
-  define-lazy-prop@3.0.0: {}
+  define-lazy-prop@3.0.0:
+    optional: true
 
   define-properties@1.2.1:
     dependencies:
@@ -9494,6 +10205,10 @@ snapshots:
       - encoding
       - supports-color
 
+  geojson-equality-ts@1.0.2:
+    dependencies:
+      '@types/geojson': 7946.0.16
+
   get-func-name@2.0.2: {}
 
   get-intrinsic@1.3.0:
@@ -9851,7 +10566,8 @@ snapshots:
 
   is-docker@2.2.1: {}
 
-  is-docker@3.0.0: {}
+  is-docker@3.0.0:
+    optional: true
 
   is-extglob@2.1.1: {}
 
@@ -9868,6 +10584,7 @@ snapshots:
   is-inside-container@1.0.0:
     dependencies:
       is-docker: 3.0.0
+    optional: true
 
   is-map@2.0.3: {}
 
@@ -9934,6 +10651,7 @@ snapshots:
   is-wsl@3.1.0:
     dependencies:
       is-inside-container: 1.0.0
+    optional: true
 
   isarray@0.0.1: {}
 
@@ -10060,6 +10778,8 @@ snapshots:
       ms: 2.1.3
       semver: 7.7.3
 
+  jsts@2.7.1: {}
+
   jwa@1.4.2:
     dependencies:
       buffer-equal-constant-time: 1.0.1
@@ -10092,12 +10812,12 @@ snapshots:
 
   kleur@4.1.5: {}
 
-  langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)):
+  langchain@1.2.12(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6)):
     dependencies:
-      '@langchain/core': 1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))
-      '@langchain/langgraph': 1.1.2(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6))(zod@4.3.6)
-      '@langchain/langgraph-checkpoint': 1.0.0(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)))
-      langsmith: 0.4.8(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6))
+      '@langchain/core': 1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))
+      '@langchain/langgraph': 1.1.2(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@4.3.6))(zod@4.3.6)
+      '@langchain/langgraph-checkpoint': 1.0.0(@langchain/core@1.1.16(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)))
+      langsmith: 0.4.8(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6))
       uuid: 10.0.0
       zod: 4.3.6
     transitivePeerDependencies:
@@ -10109,7 +10829,7 @@ snapshots:
       - react-dom
       - zod-to-json-schema
 
-  langsmith@0.4.8(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.18.0)(zod@4.3.6)):
+  langsmith@0.4.8(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.18.0)(zod@4.3.6)):
     dependencies:
       '@types/uuid': 10.0.0
       chalk: 4.1.2
@@ -10119,7 +10839,7 @@ snapshots:
       uuid: 10.0.0
     optionalDependencies:
       '@opentelemetry/api': 1.9.0
-      openai: 4.104.0(ws@8.18.0)(zod@4.3.6)
+      openai: 6.16.0(ws@8.18.0)(zod@4.3.6)
 
   language-models@0.1.0(@types/debug@4.1.12)(terser@5.46.0)(yaml@2.8.2):
     dependencies:
@@ -10394,6 +11114,8 @@ snapshots:
       - supports-color
 
   methods@1.1.2: {}
+
+  mgrs@1.0.0: {}
 
   micromark-core-commonmark@2.0.3:
     dependencies:
@@ -10783,6 +11505,7 @@ snapshots:
       keytar: 7.9.0
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
+    optional: true
 
   object-assign@4.1.1: {}
 
@@ -10832,6 +11555,7 @@ snapshots:
       define-lazy-prop: 3.0.0
       is-inside-container: 1.0.0
       wsl-utils: 0.1.0
+    optional: true
 
   open@8.4.2:
     dependencies:
@@ -11205,6 +11929,17 @@ snapshots:
 
   pluralize@8.0.0: {}
 
+  point-in-polygon-hao@1.2.4:
+    dependencies:
+      robust-predicates: 3.0.2
+
+  point-in-polygon@1.1.0: {}
+
+  polyclip-ts@0.16.8:
+    dependencies:
+      bignumber.js: 9.3.1
+      splaytree-ts: 1.0.2
+
   possible-typed-array-names@1.1.0: {}
 
   postcss@8.4.31:
@@ -11218,6 +11953,16 @@ snapshots:
       nanoid: 3.3.11
       picocolors: 1.1.1
       source-map-js: 1.2.1
+
+  postgres.do@0.1.0(@dotdo/pglite@0.1.0)(@dotdo/postgres@0.1.0)(hono@4.11.5):
+    dependencies:
+      '@dotdo/postgres-shared': 0.1.0(hono@4.11.5)
+      commander: 12.1.0
+    optionalDependencies:
+      '@dotdo/pglite': 0.1.0
+      '@dotdo/postgres': 0.1.0
+    transitivePeerDependencies:
+      - hono
 
   prebuild-install@7.1.3:
     dependencies:
@@ -11261,6 +12006,11 @@ snapshots:
   process-warning@2.3.2: {}
 
   process@0.11.10: {}
+
+  proj4@2.20.2:
+    dependencies:
+      mgrs: 1.0.0
+      wkt-parser: 1.5.2
 
   projects.do@0.0.1:
     dependencies:
@@ -11308,6 +12058,10 @@ snapshots:
 
   quick-lru@6.1.2: {}
 
+  quickselect@2.0.0: {}
+
+  quickselect@3.0.0: {}
+
   randombytes@2.1.0:
     dependencies:
       safe-buffer: 5.2.1
@@ -11320,6 +12074,14 @@ snapshots:
       http-errors: 2.0.0
       iconv-lite: 0.4.24
       unpipe: 1.0.0
+
+  rbush@3.0.1:
+    dependencies:
+      quickselect: 2.0.0
+
+  rbush@4.0.1:
+    dependencies:
+      quickselect: 3.0.0
 
   rc@1.2.8:
     dependencies:
@@ -11595,6 +12357,10 @@ snapshots:
       path-parse: 1.0.7
       supports-preserve-symlinks-flag: 1.0.0
 
+  robust-predicates@2.0.4: {}
+
+  robust-predicates@3.0.2: {}
+
   rollup@4.56.0:
     dependencies:
       '@types/estree': 1.0.8
@@ -11631,7 +12397,8 @@ snapshots:
       capnweb: 0.1.0
       oauth.do: 0.2.0(hono@4.11.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
 
-  run-applescript@7.1.0: {}
+  run-applescript@7.1.0:
+    optional: true
 
   run-async@3.0.0: {}
 
@@ -11879,6 +12646,8 @@ snapshots:
 
   space-separated-tokens@2.0.2: {}
 
+  splaytree-ts@1.0.2: {}
+
   split2@4.2.0: {}
 
   sswr@2.0.0(svelte@4.2.20):
@@ -12028,6 +12797,10 @@ snapshots:
       '@swc/counter': 0.1.3
       webpack: 5.104.1(@swc/core@1.6.1(@swc/helpers@0.5.15))
 
+  sweepline-intersections@1.5.0:
+    dependencies:
+      tinyqueue: 2.0.3
+
   swr-store@0.10.6:
     dependencies:
       dequal: 2.0.3
@@ -12171,6 +12944,8 @@ snapshots:
   tinypool@0.8.4: {}
 
   tinypool@1.1.1: {}
+
+  tinyqueue@2.0.3: {}
 
   tinyrainbow@2.0.0: {}
 
@@ -12590,6 +13365,8 @@ snapshots:
       siginfo: 2.0.0
       stackback: 0.0.2
 
+  wkt-parser@1.5.2: {}
+
   workerd@1.20250718.0:
     optionalDependencies:
       '@cloudflare/workerd-darwin-64': 1.20250718.0
@@ -12671,6 +13448,7 @@ snapshots:
   wsl-utils@0.1.0:
     dependencies:
       is-wsl: 3.1.0
+    optional: true
 
   xss@1.0.15:
     dependencies:
