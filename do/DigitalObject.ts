@@ -7,6 +7,7 @@
  * - Hibernation support (Agents SDK pattern)
  * - HTTP request handling via fetch()
  * - Child DO creation with $context linking
+ * - Automatic RPC method reflection (TypeScript-native, no manual registration)
  *
  * @example
  * ```typescript
@@ -17,13 +18,19 @@
  *     await this.state.set('status', 'active')
  *   }
  *
- *   async handlePath(request: Request, path: string): Promise<Response> {
- *     if (path === '/api/status') {
- *       const status = await this.state.get('status')
- *       return Response.json({ status })
- *     }
- *     return new Response('Not Found', { status: 404 })
+ *   // Public methods are automatically exposed via RPC
+ *   async getStatus(): Promise<string> {
+ *     return await this.state.get('status')
  *   }
+ *
+ *   // Namespaces (objects with methods) are also auto-exposed
+ *   users = {
+ *     get: async (id: string) => ({ id, name: 'User' }),
+ *     list: async () => [],
+ *   }
+ *
+ *   // Private methods (starting with _) are NOT exposed
+ *   private async _internalHelper() { }
  * }
  * ```
  *
@@ -33,7 +40,8 @@
 import type { DurableObjectState, DurableObjectId, DurableObject } from '@cloudflare/workers-types'
 import type { DigitalObjectIdentity, DOType, DigitalObjectRef } from '../types/identity'
 import type { CDCEvent, CDCOptions, CDCOperation } from '../types/storage'
-import type { RPCRequest, RPCResponse } from '../types/rpc'
+import type { RPCRequest, RPCResponse, RPCError } from '../types/rpc'
+import { RpcErrorCodes } from '../types/rpc'
 import { createDOState, type DOState } from './state'
 import { HibernationManager, type HibernationConfig } from './hibernation'
 import { ContextStreamer } from '../db/cdc/streaming'
@@ -44,6 +52,100 @@ import {
   registerIdentityMethods,
   type DOMethodContext,
 } from '../rpc/methods'
+
+// =============================================================================
+// RPC Schema Types
+// =============================================================================
+
+/**
+ * Describes a single RPC method
+ */
+export interface RpcMethodSchema {
+  /** Method name */
+  name: string
+  /** Dot-separated path (e.g. "users.get") */
+  path: string
+  /** Number of declared parameters (from Function.length) */
+  params: number
+}
+
+/**
+ * Describes a namespace (object with methods)
+ */
+export interface RpcNamespaceSchema {
+  /** Namespace name */
+  name: string
+  /** Methods within this namespace */
+  methods: RpcMethodSchema[]
+}
+
+/**
+ * Full schema for a DigitalObject's RPC interface
+ */
+export interface RpcSchema {
+  /** Schema version */
+  version: 1
+  /** Top-level RPC methods */
+  methods: RpcMethodSchema[]
+  /** Grouped namespaces (e.g. { users: { get, create } }) */
+  namespaces: RpcNamespaceSchema[]
+}
+
+// =============================================================================
+// Properties to Skip During Reflection
+// =============================================================================
+
+/** Properties to skip during RPC introspection */
+const SKIP_PROPS = new Set([
+  // DurableObject lifecycle
+  'fetch',
+  'alarm',
+  'webSocketMessage',
+  'webSocketClose',
+  'webSocketError',
+  // DigitalObject internals
+  'constructor',
+  'getSchema',
+  'getIdentity',
+  'setContext',
+  'getContext',
+  'createChild',
+  'getChild',
+  'listChildren',
+  // Protected/internal members
+  '$id',
+  '$type',
+  '$context',
+  '$version',
+  'state',
+  'hibernation',
+  'env',
+  'ctx',
+  'rpcRegistry',
+  // System properties
+  'handleRoot',
+  'handleRPC',
+  'handleWebSocket',
+  'handleCDC',
+  'handlePath',
+  'handleError',
+  'processRPC',
+  'onInitialize',
+  'onAlarm',
+  // Internal methods
+  'initialize',
+  'resolveId',
+  'getDefaultType',
+  'getHibernationConfig',
+  'registerStateMethods',
+  'registerRPCMethods',
+  'parseCDCOptions',
+  'handleCDCWebSocket',
+  'handleCDCSSE',
+  'shouldSendCDCEvent',
+  'stripDocuments',
+  'setupContextPropagation',
+])
 
 /**
  * Environment bindings for the Digital Object
@@ -504,6 +606,9 @@ export abstract class DigitalObject implements DurableObject {
         case '/$identity':
           return Response.json(this.getIdentity())
 
+        case '/__schema':
+          return Response.json(this.getSchema())
+
         default:
           // Delegate to subclass
           return await this.handlePath(request, path)
@@ -533,7 +638,9 @@ export abstract class DigitalObject implements DurableObject {
   /**
    * Handle JSON-RPC requests to /rpc
    *
-   * Supports the DORPCMethods interface defined in types/rpc.ts
+   * Supports the DORPCMethods interface defined in types/rpc.ts.
+   * Supports both single requests and batch requests (array of requests).
+   * Uses automatic reflection to expose public methods and namespaces.
    *
    * @param request - The incoming RPC request
    * @returns RPC response
@@ -543,7 +650,15 @@ export abstract class DigitalObject implements DurableObject {
       return new Response('Method Not Allowed', { status: 405 })
     }
 
-    const rpcRequest: RPCRequest = await request.json()
+    const body = (await request.json()) as RPCRequest | RPCRequest[]
+
+    // Support batch requests (array of RPC calls)
+    if (Array.isArray(body)) {
+      const responses = await Promise.all(body.map((req) => this.processRPC(req)))
+      return Response.json(responses)
+    }
+
+    const rpcRequest = body
     const response = await this.processRPC(rpcRequest)
 
     return Response.json(response)
@@ -552,25 +667,264 @@ export abstract class DigitalObject implements DurableObject {
   /**
    * Process a single RPC request
    *
-   * Dispatches the request to the appropriate handler in the RPC registry.
+   * Dispatches the request using automatic reflection for method discovery.
+   * First tries auto-discovered methods/namespaces, then falls back to registry.
    *
    * @param request - The RPC request object
    * @returns RPC response object
    */
   protected async processRPC(request: RPCRequest): Promise<RPCResponse> {
-    // Build method context with DO-specific properties
-    const methodContext: DOMethodContext = {
-      state: this.ctx,
-      env: this.env,
-      meta: request.meta,
-      getIdentity: () => this.getIdentity(),
-      setContext: (context) => this.setContext(context),
-      getContext: () => this.getContext(),
-      listChildren: (type) => this.listChildren(type),
+    try {
+      // Try automatic reflection first
+      const result = await this.dispatchReflected(request.method, request.params)
+      if (result !== undefined) {
+        return {
+          id: request.id,
+          result,
+        }
+      }
+
+      // Fall back to manually registered methods in the registry
+      const methodContext: DOMethodContext = {
+        state: this.ctx,
+        env: this.env,
+        meta: request.meta,
+        getIdentity: () => this.getIdentity(),
+        setContext: (context) => this.setContext(context),
+        getContext: () => this.getContext(),
+        listChildren: (type) => this.listChildren(type),
+      }
+
+      // Check if method exists in registry
+      if (this.rpcRegistry.has(request.method)) {
+        return dispatch(this.rpcRegistry, request, methodContext)
+      }
+
+      // Method not found
+      return {
+        id: request.id,
+        error: {
+          code: RpcErrorCodes.MethodNotFound,
+          message: `Method not found: ${request.method}`,
+        },
+      }
+    } catch (error) {
+      const rpcError: RPCError = {
+        code: RpcErrorCodes.InternalError,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        data: error instanceof Error ? { stack: error.stack } : undefined,
+      }
+
+      return {
+        id: request.id,
+        error: rpcError,
+      }
+    }
+  }
+
+  /**
+   * Dispatch a method call using automatic reflection
+   *
+   * Looks up the method on this instance (including prototype chain)
+   * and invokes it if found and allowed.
+   *
+   * @param methodPath - Method path (e.g., "publicMethod" or "users.get")
+   * @param params - Parameters to pass to the method
+   * @returns Method result, or undefined if method not found via reflection
+   */
+  private async dispatchReflected(methodPath: string, params: unknown): Promise<unknown> {
+    // Check if it's a system/private method that should be blocked
+    if (methodPath.startsWith('_') || SKIP_PROPS.has(methodPath)) {
+      return undefined
     }
 
-    // Dispatch to the registry
-    return dispatch(this.rpcRegistry, request, methodContext)
+    // Handle namespaced methods (e.g., "users.get")
+    if (methodPath.includes('.')) {
+      const [namespace, methodName] = methodPath.split('.')
+
+      // Skip if namespace or method starts with _
+      if (namespace.startsWith('_') || methodName.startsWith('_')) {
+        return undefined
+      }
+
+      // Skip if namespace is in SKIP_PROPS
+      if (SKIP_PROPS.has(namespace)) {
+        return undefined
+      }
+
+      // Try to get the namespace object
+      const nsValue = this.getReflectedProperty(namespace)
+      if (nsValue && typeof nsValue === 'object' && !Array.isArray(nsValue)) {
+        const nsMethod = (nsValue as Record<string, unknown>)[methodName]
+        if (typeof nsMethod === 'function') {
+          // Call with proper binding and params
+          const args = this.extractArgs(params, nsMethod.length)
+          const result = await nsMethod.apply(nsValue, args)
+          return result
+        }
+      }
+      return undefined
+    }
+
+    // Handle top-level methods
+    const method = this.getReflectedProperty(methodPath)
+    if (typeof method === 'function') {
+      const args = this.extractArgs(params, method.length)
+      const result = await method.apply(this, args)
+      return result
+    }
+
+    return undefined
+  }
+
+  /**
+   * Get a property from this instance, checking prototype chain
+   *
+   * @param key - Property name
+   * @returns Property value or undefined
+   */
+  private getReflectedProperty(key: string): unknown {
+    // Skip private and system properties
+    if (key.startsWith('_') || SKIP_PROPS.has(key)) {
+      return undefined
+    }
+
+    try {
+      return (this as unknown as Record<string, unknown>)[key]
+    } catch {
+      return undefined
+    }
+  }
+
+  /**
+   * Extract method arguments from RPC params
+   *
+   * Supports both object params (named) and array params (positional).
+   * When argCount is 1 and params is an object:
+   * - If the object has a single key and the value is a primitive, extract that value
+   * - Otherwise, pass the entire object as the single argument
+   *
+   * @param params - RPC params (object or array)
+   * @param argCount - Number of expected arguments
+   * @returns Array of arguments
+   */
+  private extractArgs(params: unknown, argCount: number): unknown[] {
+    if (params === undefined || params === null) {
+      return []
+    }
+
+    // If params is an array, use directly
+    if (Array.isArray(params)) {
+      return params
+    }
+
+    // If params is an object, handle based on argCount
+    if (typeof params === 'object') {
+      const paramObj = params as Record<string, unknown>
+      const keys = Object.keys(paramObj)
+
+      // If no keys (empty object), no args needed
+      if (keys.length === 0) {
+        return []
+      }
+
+      // If argCount is 1, we need to determine if the single arg should be:
+      // a) The entire object (when the method expects an object parameter)
+      // b) A single extracted value (when the object has one key with a primitive)
+      if (argCount === 1) {
+        // If there's exactly one key and its value is a primitive, extract it
+        if (keys.length === 1) {
+          const value = paramObj[keys[0]]
+          if (value === null || typeof value !== 'object') {
+            return [value]
+          }
+        }
+        // Otherwise, pass the entire params object as the single argument
+        return [paramObj]
+      }
+
+      // For multiple expected args, try to map object keys to positional args
+      if (argCount > 1 && keys.length >= argCount) {
+        return keys.slice(0, argCount).map((k) => paramObj[k])
+      }
+
+      // Fallback: pass keys as separate args
+      return keys.map((k) => paramObj[k])
+    }
+
+    // Single primitive value
+    return [params]
+  }
+
+  /**
+   * Get the RPC schema for this DigitalObject
+   *
+   * Introspects the instance to discover public methods and namespaces.
+   * Used by the /__schema endpoint for client code generation.
+   *
+   * @returns RPC schema describing available methods and namespaces
+   */
+  getSchema(): RpcSchema {
+    const methods: RpcMethodSchema[] = []
+    const namespaces: RpcNamespaceSchema[] = []
+    const seen = new Set<string>()
+
+    // Collect properties from instance and prototype chain
+    const collectProps = (obj: object | null) => {
+      if (!obj || obj === Object.prototype) return
+
+      for (const key of Object.getOwnPropertyNames(obj)) {
+        if (seen.has(key) || SKIP_PROPS.has(key) || key.startsWith('_')) {
+          continue
+        }
+        seen.add(key)
+
+        let value: unknown
+        try {
+          value = (this as unknown as Record<string, unknown>)[key]
+        } catch {
+          continue
+        }
+
+        if (typeof value === 'function') {
+          methods.push({
+            name: key,
+            path: key,
+            params: value.length,
+          })
+        } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+          // Check if it's a namespace (object with function properties)
+          const nsMethods: RpcMethodSchema[] = []
+          for (const nsKey of Object.keys(value as object)) {
+            const nsValue = (value as Record<string, unknown>)[nsKey]
+            if (typeof nsValue === 'function') {
+              nsMethods.push({
+                name: nsKey,
+                path: `${key}.${nsKey}`,
+                params: nsValue.length,
+              })
+            }
+          }
+          if (nsMethods.length > 0) {
+            namespaces.push({ name: key, methods: nsMethods })
+          }
+        }
+      }
+    }
+
+    // Walk instance own props first, then prototype chain (up to DigitalObject)
+    collectProps(this)
+    let proto = Object.getPrototypeOf(this)
+    while (proto && proto !== DigitalObject.prototype && proto !== Object.prototype) {
+      collectProps(proto)
+      proto = Object.getPrototypeOf(proto)
+    }
+
+    return {
+      version: 1,
+      methods,
+      namespaces,
+    }
   }
 
   /**
