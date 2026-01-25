@@ -1,40 +1,19 @@
 /**
  * Test Utilities for DO (Digital Object) Project
  *
- * Re-exports all test utilities, mocks, and fixtures.
+ * Re-exports test utilities and fixtures.
+ *
+ * IMPORTANT: No mocks! Per CLAUDE.md NO MOCKS policy:
+ * - Workers tests use real miniflare via vitest.workers.config.ts
+ * - Node tests use inline mock helpers where absolutely necessary
+ *
+ * @see tests/storage.workers.test.ts for real environment testing pattern
  */
 
 // Setup utilities
 export { waitFor, createDeferred, sleep } from './setup'
 
-// Mocks
-export {
-  // DurableObject mocks
-  createMockDurableObjectStorage,
-  createMockDurableObjectState,
-  createMockDurableObjectNamespace,
-  createMockDurableObjectStub,
-  // WebSocket mocks
-  createMockWebSocket,
-  // Identity mocks
-  createMockDOIdentity,
-  // CDC mocks
-  createMockCDCEvent,
-  createMockCDCCursor,
-  createMockCDCBatch,
-  // RPC mocks
-  createMockRPCRequest,
-  createMockRPCResponse,
-  // Environment mocks
-  createMockEnv,
-  createMockKVNamespace,
-  createMockR2Bucket,
-  createMockAI,
-  // Types
-  type MockEnv,
-} from './mocks'
-
-// Fixtures
+// Fixtures (test data, not mocks)
 export {
   // Sample data
   fixtures,

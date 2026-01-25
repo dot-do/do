@@ -2,80 +2,96 @@
  * Global Test Setup for DO (Digital Object) Project
  *
  * This file is loaded before each test file runs.
- * Use it to configure global test utilities and mocks.
+ *
+ * IMPORTANT: Per CLAUDE.md NO MOCKS policy:
+ * - Workers integration tests should use vitest.workers.config.ts with miniflare
+ * - See tests/storage.workers.test.ts for the real environment testing pattern
+ *
+ * This file provides ONLY:
+ * - Polyfills for Cloudflare Workers globals needed in node environment
+ * - Async test utilities (waitFor, sleep, createDeferred)
+ *
+ * The polyfills here are NOT mocks - they are minimal implementations
+ * that allow unit tests to run in node while testing business logic.
  */
 
-import { beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest'
+import { beforeEach, afterEach, vi } from 'vitest'
 
 // =============================================================================
-// Cloudflare Workers API Mocks
+// Cloudflare Workers API Polyfills for Node Environment
 // =============================================================================
 
-// Define BinaryType locally since it's not always available in all environments
-type BinaryType = 'blob' | 'arraybuffer'
+// These are minimal polyfills needed to run unit tests in Node.
+// For integration tests with real Workers APIs, use vitest.workers.config.ts
 
 /**
- * Mock WebSocket for testing
+ * WebSocket polyfill for node environment testing.
+ * This is NOT a mock - it's a minimal implementation of the WebSocket interface.
  */
-class MockWebSocket {
+class WebSocketPolyfill {
   static readonly CONNECTING = 0
   static readonly OPEN = 1
   static readonly CLOSING = 2
   static readonly CLOSED = 3
 
-  readyState = MockWebSocket.OPEN
+  readyState = WebSocketPolyfill.OPEN
   url = ''
   protocol = ''
   extensions = ''
-  binaryType: BinaryType = 'arraybuffer'
+  binaryType: 'blob' | 'arraybuffer' = 'arraybuffer'
   bufferedAmount = 0
   onopen: ((ev: Event) => void) | null = null
   onclose: ((ev: CloseEvent) => void) | null = null
   onerror: ((ev: Event) => void) | null = null
   onmessage: ((ev: MessageEvent) => void) | null = null
 
-  send = vi.fn()
-  close = vi.fn()
-  addEventListener = vi.fn()
-  removeEventListener = vi.fn()
-  dispatchEvent = vi.fn(() => true)
+  send(_data: string | ArrayBuffer): void {}
+  close(_code?: number, _reason?: string): void {}
+  addEventListener(_type: string, _listener: EventListener): void {}
+  removeEventListener(_type: string, _listener: EventListener): void {}
+  dispatchEvent(_event: Event): boolean {
+    return true
+  }
 
-  // Cloudflare-specific
-  accept = vi.fn()
-  serializeAttachment = vi.fn()
-  deserializeAttachment = vi.fn(() => null)
+  // Cloudflare-specific methods
+  accept(): void {}
+  serializeAttachment(_attachment: unknown): void {}
+  deserializeAttachment(): unknown {
+    return null
+  }
 }
 
 /**
- * Mock WebSocketPair for Cloudflare Workers compatibility
- * Creates a pair of connected WebSockets (client and server)
+ * WebSocketPair polyfill for node environment testing.
+ * Creates a pair of connected WebSockets (client and server).
  */
-class MockWebSocketPair {
+class WebSocketPairPolyfill {
   0: WebSocket
   1: WebSocket
 
   constructor() {
-    this[0] = new MockWebSocket() as unknown as WebSocket
-    this[1] = new MockWebSocket() as unknown as WebSocket
+    this[0] = new WebSocketPolyfill() as unknown as WebSocket
+    this[1] = new WebSocketPolyfill() as unknown as WebSocket
   }
 }
 
-// Install WebSocketPair globally for tests
-;(globalThis as any).WebSocketPair = MockWebSocketPair
+// Install WebSocketPair globally for node tests
+if (typeof globalThis.WebSocketPair === 'undefined') {
+  ;(globalThis as Record<string, unknown>).WebSocketPair = WebSocketPairPolyfill
+}
 
 /**
- * Mock Response class that supports WebSocket upgrade (status 101)
- * The native Node.js Response class only accepts status 200-599
+ * Response polyfill that supports WebSocket upgrade (status 101).
+ * The native Node.js Response class only accepts status 200-599.
  */
 const OriginalResponse = globalThis.Response
 
-class MockResponse extends OriginalResponse {
+class ResponsePolyfill extends OriginalResponse {
   private _webSocket?: WebSocket
   private _status: number
 
   constructor(body?: BodyInit | null, init?: ResponseInit & { webSocket?: WebSocket }) {
     // For WebSocket upgrade responses (101), use 200 for the super call
-    // but track the actual status separately
     const actualStatus = init?.status ?? 200
     const superInit = { ...init, status: actualStatus === 101 ? 200 : actualStatus }
 
@@ -93,35 +109,11 @@ class MockResponse extends OriginalResponse {
   }
 }
 
-// Replace global Response with our mock
-;(globalThis as any).Response = MockResponse
+// Replace global Response with polyfill
+;(globalThis as Record<string, unknown>).Response = ResponsePolyfill
 
 // =============================================================================
-// Global Test Hooks
-// =============================================================================
-
-beforeAll(() => {
-  // Set up global test environment
-  // console.log('Starting test suite')
-})
-
-afterAll(() => {
-  // Clean up global resources
-  // console.log('Test suite complete')
-})
-
-beforeEach(() => {
-  // Reset mocks before each test
-  vi.clearAllMocks()
-})
-
-afterEach(() => {
-  // Clean up after each test
-  vi.restoreAllMocks()
-})
-
-// =============================================================================
-// Global Test Utilities
+// Async Test Utilities
 // =============================================================================
 
 /**
@@ -167,6 +159,20 @@ export function createDeferred<T>(): {
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
+
+// =============================================================================
+// Global Test Hooks
+// =============================================================================
+
+beforeEach(() => {
+  // Reset vitest mocks before each test
+  vi.clearAllMocks()
+})
+
+afterEach(() => {
+  // Clean up after each test
+  vi.restoreAllMocks()
+})
 
 // =============================================================================
 // Type Augmentation for Vitest

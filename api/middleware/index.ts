@@ -5,16 +5,25 @@
  */
 
 // =============================================================================
-// Authentication
+// Authentication (from oauth.do/hono)
 // =============================================================================
 export {
-  createAuthMiddleware,
-  createApiKeyMiddleware,
+  // oauth.do middleware
+  auth,
+  requireAuth,
+  apiKey,
+  combined,
+  // Helper functions
   getUser,
   requireUser,
   hasRole,
   hasPermission,
+  isAuthenticated,
+  getToken,
 } from './auth'
+
+// Re-export types from oauth.do
+export type { AuthUser, AuthOptions, RequireAuthOptions, ApiKeyOptions, AuthVariables } from './auth'
 
 // =============================================================================
 // CORS
@@ -51,7 +60,7 @@ import type { Context, Next } from 'hono'
 import type { Env, DOContext } from '../types'
 
 // Import for internal use in composeMiddleware
-import { createAuthMiddleware } from './auth'
+import { auth } from './auth'
 import { createCorsMiddleware } from './cors'
 import { createRateLimitMiddleware } from './rateLimit'
 
@@ -237,7 +246,7 @@ export function composeMiddleware(options: {
   }
 
   if (options.auth) {
-    middleware.push(createAuthMiddleware())
+    middleware.push(auth())
   }
 
   return middleware

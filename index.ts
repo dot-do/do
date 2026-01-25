@@ -212,20 +212,19 @@ export type {
 // export * from './cli'
 
 // =============================================================================
-// API Layer (Hono-based)
+// API Layer (Hono-based, convention-driven via @dotdo/apis)
 // =============================================================================
 export {
+  // Backwards-compatible createApp functions (deprecated)
   createApp,
   createMinimalApp,
   createProductionApp,
   createDevelopmentApp,
+  // Routes
   createHealthRoutes,
-  createDORoutes,
   createAIRoutes,
   createMCPRoutes,
-  createRootRoute,
-  createRPCRoutes,
-  createAllRoutes,
+  // Middleware
   composeMiddleware,
   createContextMiddleware,
   createErrorMiddleware,
@@ -235,17 +234,28 @@ export {
   createRateLimitMiddleware as createAPIRateLimitMiddleware,
   createAIRateLimitMiddleware,
   createWriteRateLimitMiddleware,
-  createAuthMiddleware as createAPIAuthMiddleware,
-  createApiKeyMiddleware,
+  // oauth.do auth middleware
+  auth as apiAuth,
+  requireAuth as apiRequireAuth,
+  apiKey as apiApiKey,
+  combined as apiCombined,
   getUser,
   requireUser,
   hasRole,
   hasPermission,
+  isAuthenticated,
+  getToken,
+  // Schema
+  schema as apiSchema,
+  // Types
   type AppConfig,
   type Env as APIEnv,
   type DOContext as APIDOContext,
   type AuthUser,
   type AuthOptions,
+  type RequireAuthOptions,
+  type ApiKeyOptions,
+  type AuthVariables,
   type APIResponse,
   type APIErrorResponse,
   type PaginatedResponse,
@@ -261,6 +271,9 @@ export {
   type MCPToolCallResponse,
   type MCPListToolsResponse,
 } from './api'
+
+// Default API export (convention-based)
+export { default as doApi } from './api'
 
 // =============================================================================
 // Type Re-exports from ../types/

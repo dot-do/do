@@ -1,16 +1,18 @@
 /**
  * Setup Verification Test
  *
- * A simple test to verify the Vitest configuration is working correctly
- * with test utilities, mocks, and fixtures.
+ * Verifies the Vitest configuration is working correctly with:
+ * - Test fixtures (test data)
+ * - Async utilities (waitFor, sleep, createDeferred)
+ * - Node environment Web APIs
+ *
+ * NOTE: No mock utilities - per CLAUDE.md NO MOCKS policy.
+ * For real Workers API testing, use vitest.workers.config.ts with miniflare.
+ * See tests/storage.workers.test.ts for the pattern.
  */
 
 import { describe, it, expect, vi } from 'vitest'
 import {
-  createMockDurableObjectState,
-  createMockDOIdentity,
-  createMockCDCEvent,
-  createMockEnv,
   fixtures,
   createIdentity,
   createDOHierarchy,
@@ -34,60 +36,6 @@ describe('Vitest Setup Verification', () => {
       const mockFn = vi.fn().mockReturnValue(42)
       expect(mockFn()).toBe(42)
       expect(mockFn).toHaveBeenCalledTimes(1)
-    })
-  })
-
-  describe('Mock Utilities', () => {
-    it('should create mock DurableObjectState', () => {
-      const state = createMockDurableObjectState({ id: 'test-do' })
-
-      expect(state.id.toString()).toBe('test-do')
-      expect(state.storage).toBeDefined()
-      expect(state.blockConcurrencyWhile).toBeDefined()
-    })
-
-    it('should create mock DurableObjectState with storage operations', async () => {
-      const state = createMockDurableObjectState()
-      const storage = state.storage
-
-      // Test put and get
-      await storage.put('key1', { value: 'test' })
-      const result = await storage.get('key1')
-
-      expect(result).toEqual({ value: 'test' })
-    })
-
-    it('should create mock DO identity', () => {
-      const identity = createMockDOIdentity({
-        $id: 'https://test.example.com',
-        $type: 'Business',
-      })
-
-      expect(identity.$id).toBe('https://test.example.com')
-      expect(identity.$type).toBe('Business')
-      expect(identity.$version).toBe(1)
-      expect(identity.$createdAt).toBeDefined()
-    })
-
-    it('should create mock CDC events', () => {
-      const event = createMockCDCEvent({
-        collection: 'users',
-        operation: 'INSERT',
-        after: { name: 'Alice' },
-      })
-
-      expect(event.collection).toBe('users')
-      expect(event.operation).toBe('INSERT')
-      expect(event.after).toEqual({ name: 'Alice' })
-    })
-
-    it('should create mock environment bindings', () => {
-      const env = createMockEnv()
-
-      expect(env.DO).toBeDefined()
-      expect(env.KV).toBeDefined()
-      expect(env.R2).toBeDefined()
-      expect(env.AI).toBeDefined()
     })
   })
 

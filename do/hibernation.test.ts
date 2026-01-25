@@ -14,14 +14,57 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
-  createMockDurableObjectState,
-} from '../tests/utils'
-import {
   HibernationManager,
   createHibernationManager,
   type HibernationConfig,
   type WebSocketState,
 } from './hibernation'
+
+// =============================================================================
+// Inline Test Helper (minimal mock for node environment testing)
+// =============================================================================
+
+/**
+ * Creates a minimal mock DurableObjectState for testing.
+ * For real Workers runtime tests, use vitest.workers.config.ts with miniflare.
+ */
+function createMockDurableObjectState(options: { id?: string } = {}) {
+  const id = options.id || 'test-do-id'
+  const storage = new Map<string, unknown>()
+
+  return {
+    id: {
+      toString: () => id,
+      name: id,
+      equals: vi.fn((other: { toString: () => string }) => other.toString() === id),
+    },
+    storage: {
+      get: vi.fn(async (key: string) => storage.get(key)),
+      put: vi.fn(async (key: string, value: unknown) => {
+        storage.set(key, value)
+      }),
+      delete: vi.fn(async (key: string | string[]) => {
+        const keys = Array.isArray(key) ? key : [key]
+        let deleted = false
+        for (const k of keys) {
+          if (storage.has(k)) {
+            storage.delete(k)
+            deleted = true
+          }
+        }
+        return deleted
+      }),
+      list: vi.fn(async () => new Map(storage)),
+      setAlarm: vi.fn(async () => {}),
+      getAlarm: vi.fn(async () => null),
+      deleteAlarm: vi.fn(async () => {}),
+    },
+    blockConcurrencyWhile: vi.fn(async <T>(fn: () => Promise<T>) => fn()),
+    acceptWebSocket: vi.fn(),
+    getWebSockets: vi.fn(() => []),
+    waitUntil: vi.fn(),
+  }
+}
 
 describe('HibernationManager', () => {
   let mockCtx: ReturnType<typeof createMockDurableObjectState>
