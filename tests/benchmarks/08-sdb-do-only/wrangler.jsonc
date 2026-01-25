@@ -1,0 +1,10 @@
+{
+  "$schema": "https://schema.cloudflare.com/wrangler.json",
+  "name": "bench-08-sdb-do-only",
+  "main": "worker.ts",
+  "compatibility_date": "2026-01-23",
+  "durable_objects": {
+    "bindings": [{ "name": "DO", "class_name": "MinimalSDB" }]
+  },
+  "migrations": [{ "tag": "v1", "new_classes": ["MinimalSDB"] }]
+}
