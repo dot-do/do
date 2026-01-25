@@ -1,0 +1,10 @@
+{
+  "$schema": "https://schema.cloudflare.com/wrangler.json",
+  "name": "bench-01-bare-do",
+  "main": "worker.ts",
+  "compatibility_date": "2026-01-23",
+  "durable_objects": {
+    "bindings": [{ "name": "DO", "class_name": "BareMinimumDO" }]
+  },
+  "migrations": [{ "tag": "v1", "new_classes": ["BareMinimumDO"] }]
+}

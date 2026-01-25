@@ -1,0 +1,13 @@
+{
+  "$schema": "https://schema.cloudflare.com/wrangler.json",
+  "name": "bench-04-minimal-routing",
+  "main": "worker.ts",
+  "compatibility_date": "2026-01-23",
+  "durable_objects": {
+    "bindings": [{ "name": "DO", "class_name": "RoutedDO" }]
+  },
+  "migrations": [{ "tag": "v1", "new_classes": ["RoutedDO"] }],
+  "vars": {
+    "ROUTING_STRATEGY": "hostname-user"
+  }
+}

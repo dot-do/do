@@ -1,0 +1,11 @@
+{
+  "$schema": "https://schema.cloudflare.com/wrangler.json",
+  "name": "bench-05-with-rpc-do",
+  "main": "worker.ts",
+  "compatibility_date": "2026-01-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [{ "name": "DO", "class_name": "SimpleDO" }]
+  },
+  "migrations": [{ "tag": "v1", "new_classes": ["SimpleDO"] }]
+}
