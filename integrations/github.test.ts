@@ -242,7 +242,7 @@ describe('GitHubIntegration', () => {
       const state = await integration.connect(connectConfig);
 
       expect(state.type).toBe('github');
-      expect(state.status).toBe('active');
+      expect(state.status).toBe('Active');
       expect(state.installationId).toBe('inst_test123');
       expect(state.repository).toBe('owner/test-repo');
       expect(state.branch).toBe('main');
@@ -315,7 +315,7 @@ describe('GitHubIntegration', () => {
       const result = await integration.healthCheck();
 
       expect(result.healthy).toBe(false);
-      expect(result.status).toBe('not_configured');
+      expect(result.status).toBe('NotConfigured');
     });
 
     it('should verify repository access', async () => {
@@ -605,7 +605,7 @@ describe('GitHubIntegration', () => {
       await integration.handleWebhook(payload);
 
       const state = await integration.getState();
-      expect(state!.status).toBe('suspended');
+      expect(state!.status).toBe('Suspended');
     });
   });
 });

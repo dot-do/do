@@ -215,13 +215,13 @@ export interface Action<TInput = unknown, TOutput = unknown, TConfig = unknown> 
 }
 
 export type ActionStatus =
-  | 'Pending'    // Waiting to start
-  | 'Running'    // Currently executing
-  | 'Completed'  // Successfully finished
-  | 'Failed'     // Failed with error
-  | 'Cancelled'  // Cancelled before completion
-  | 'Retrying'   // Failed, will retry
-  | 'Blocked'    // Waiting on dependency
+  | 'pending'    // Waiting to start
+  | 'running'    // Currently executing
+  | 'completed'  // Successfully finished
+  | 'failed'     // Failed with error
+  | 'cancelled'  // Cancelled before completion
+  | 'retrying'   // Failed, will retry
+  | 'blocked'    // Waiting on dependency
 
 /**
  * Request that initiated an action

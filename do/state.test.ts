@@ -35,22 +35,78 @@ function createMockDurableObjectState(options: { id?: string } = {}) {
       equals: vi.fn((other: { toString: () => string }) => other.toString() === id),
     },
     storage: {
-      get: vi.fn(async (key: string) => storage.get(key)),
-      put: vi.fn(async (key: string, value: unknown) => {
-        storage.set(key, value)
+      // get supports both single key (returns value) and array of keys (returns Map)
+      get: vi.fn(async (keyOrKeys: string | string[]) => {
+        if (Array.isArray(keyOrKeys)) {
+          const result = new Map<string, unknown>()
+          for (const key of keyOrKeys) {
+            const value = storage.get(key)
+            if (value !== undefined) {
+              result.set(key, value)
+            }
+          }
+          return result
+        }
+        return storage.get(keyOrKeys)
+      }),
+      // put supports single key-value, Map of entries, or Object of entries
+      put: vi.fn(async (keyOrEntries: string | Map<string, unknown> | Record<string, unknown>, value?: unknown) => {
+        if (keyOrEntries instanceof Map) {
+          for (const [k, v] of keyOrEntries) {
+            storage.set(k, v)
+          }
+        } else if (typeof keyOrEntries === 'object' && keyOrEntries !== null && !(keyOrEntries instanceof String)) {
+          // Handle plain object (from Object.fromEntries)
+          for (const [k, v] of Object.entries(keyOrEntries)) {
+            storage.set(k, v)
+          }
+        } else {
+          storage.set(keyOrEntries as string, value)
+        }
       }),
       delete: vi.fn(async (key: string | string[]) => {
         const keys = Array.isArray(key) ? key : [key]
-        let deleted = false
+        let deletedCount = 0
         for (const k of keys) {
           if (storage.has(k)) {
             storage.delete(k)
-            deleted = true
+            deletedCount++
           }
         }
-        return deleted
+        // Return boolean for single key, count for array
+        return Array.isArray(key) ? deletedCount : deletedCount > 0
       }),
-      list: vi.fn(async () => new Map(storage)),
+      list: vi.fn(async (options?: { prefix?: string; limit?: number; start?: string; end?: string; reverse?: boolean }) => {
+        let entries = Array.from(storage.entries())
+
+        // Apply prefix filter
+        if (options?.prefix) {
+          entries = entries.filter(([key]) => key.startsWith(options.prefix!))
+        }
+
+        // Apply start/end range
+        if (options?.start) {
+          entries = entries.filter(([key]) => key >= options.start!)
+        }
+        if (options?.end) {
+          entries = entries.filter(([key]) => key < options.end!)
+        }
+
+        // Sort (ascending by default)
+        entries.sort((a, b) => a[0].localeCompare(b[0]))
+
+        // Apply reverse
+        if (options?.reverse) {
+          entries.reverse()
+        }
+
+        // Apply limit
+        if (options?.limit) {
+          entries = entries.slice(0, options.limit)
+        }
+
+        return new Map(entries)
+      }),
       setAlarm: vi.fn(async () => {}),
       getAlarm: vi.fn(async () => null),
       deleteAlarm: vi.fn(async () => {}),

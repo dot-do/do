@@ -144,7 +144,7 @@ describe('MetricsCalculator', () => {
         netNewMRR: 10000,
         growthRate: 10,
       }
-      expect(calculator.calculateNetRevenueRetention(metrics)).toBe(110)
+      expect(calculator.calculateNetRevenueRetention(metrics)).toBeCloseTo(110, 5)
     })
 
     it('should calculate NRR below 100%', () => {

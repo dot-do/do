@@ -72,6 +72,8 @@ describe('VoiceSessionManager', () => {
     mockAdapter = createMockAdapter()
 
     // Setup storage to return agent with provider ID
+    // Store the original mock implementation
+    const store = new Map<string, unknown>()
     mockStorage.get.mockImplementation(async (key: string) => {
       if (key.startsWith('voice_agent:')) {
         return {
@@ -80,7 +82,10 @@ describe('VoiceSessionManager', () => {
           provider: 'vapi',
         }
       }
-      return mockStorage.get(key)
+      return store.get(key)
+    })
+    mockStorage.put.mockImplementation(async (key: string, value: unknown) => {
+      store.set(key, value)
     })
 
     VoiceProviderFactory.register(mockAdapter)

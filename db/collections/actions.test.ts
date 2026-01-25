@@ -707,10 +707,10 @@ describe('ActionCollection', () => {
     })
 
     it('should find by status', async () => {
-      const pending = await actions.findByStatus('Pending')
-      const running = await actions.findByStatus('Running')
-      const completed = await actions.findByStatus('Completed')
-      const failed = await actions.findByStatus('Failed')
+      const pending = await actions.findByStatus('pending')
+      const running = await actions.findByStatus('running')
+      const completed = await actions.findByStatus('completed')
+      const failed = await actions.findByStatus('failed')
 
       expect(pending.length).toBe(1)
       expect(running.length).toBe(1)
@@ -755,10 +755,10 @@ describe('ActionCollection', () => {
     it('should get stats by status', async () => {
       const stats = await actions.getStats()
 
-      expect(stats.Pending).toBe(1)
-      expect(stats.Running).toBe(1)
-      expect(stats.Completed).toBe(1)
-      expect(stats.Failed).toBe(1)
+      expect(stats.pending).toBe(1)
+      expect(stats.running).toBe(1)
+      expect(stats.completed).toBe(1)
+      expect(stats.failed).toBe(1)
     })
   })
 

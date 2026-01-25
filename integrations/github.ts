@@ -967,33 +967,33 @@ class GitHubIntegration extends BaseIntegration<GitHubDeepIntegration> {
   /**
    * Map installation permissions to our format
    */
-  private mapPermissions(permissions: any): RepositoryPermissions {
+  private mapPermissions(permissions: GitHubInstallationPermissions): RepositoryPermissions {
     return {
       contents: permissions.contents,
       pullRequests: permissions.pull_requests,
       issues: permissions.issues,
       actions: permissions.actions,
       webhooks: permissions.webhooks,
-    };
+    }
   }
 
   /**
    * Map API commit to our format
    */
-  private mapCommit(commit: any): Commit {
+  private mapCommit(commit: GitHubCommitResponse): Commit {
     return {
       sha: commit.sha,
       message: commit.message,
       author: commit.author,
       committer: commit.committer,
       url: commit.url,
-    };
+    }
   }
 
   /**
    * Map API pull request to our format
    */
-  private mapPullRequest(pr: any): PullRequest {
+  private mapPullRequest(pr: GitHubPullRequestResponse): PullRequest {
     return {
       id: pr.id,
       number: pr.number,
@@ -1009,115 +1009,469 @@ class GitHubIntegration extends BaseIntegration<GitHubDeepIntegration> {
       htmlUrl: pr.html_url,
       createdAt: pr.created_at,
       updatedAt: pr.updated_at,
-    };
+    }
   }
 
   /**
    * Map API issue to our format
    */
-  private mapIssue(issue: any): Issue {
+  private mapIssue(issue: GitHubIssueResponse): Issue {
     return {
       id: issue.id,
       number: issue.number,
       title: issue.title,
       body: issue.body,
       state: issue.state,
-      labels: issue.labels.map((l: any) => l.name),
-      assignees: issue.assignees.map((a: any) => a.login),
+      labels: issue.labels.map((l: GitHubLabel) => l.name),
+      assignees: issue.assignees.map((a: GitHubUser) => a.login),
       url: issue.url,
       htmlUrl: issue.html_url,
       createdAt: issue.created_at,
       updatedAt: issue.updated_at,
-    };
+    }
   }
 
   /**
    * Handle push event
    */
-  private async handlePushEvent(event: any): Promise<void> {
-    this.debug('Push event', { ref: event.ref, commits: event.commits?.length });
+  private async handlePushEvent(event: GitHubPushWebhookEvent): Promise<void> {
+    this.debug('Push event', { ref: event.ref, commits: event.commits?.length })
 
     // Update last sync SHA if this is our tracked branch
     if (event.ref === `refs/heads/${this.state!.branch}`) {
       this.updateState({
         lastSyncSha: event.after,
         lastActivityAt: Date.now(),
-      });
+      })
     }
   }
 
   /**
    * Handle pull request event
    */
-  private async handlePullRequestEvent(event: any): Promise<void> {
-    this.debug('Pull request event', { action: event.action, number: event.number });
+  private async handlePullRequestEvent(event: GitHubPullRequestWebhookEvent): Promise<void> {
+    this.debug('Pull request event', { action: event.action, number: event.number })
     // Emit event or trigger workflow
   }
 
   /**
    * Handle issues event
    */
-  private async handleIssuesEvent(event: any): Promise<void> {
-    this.debug('Issues event', { action: event.action, number: event.issue?.number });
+  private async handleIssuesEvent(event: GitHubIssuesWebhookEvent): Promise<void> {
+    this.debug('Issues event', { action: event.action, number: event.issue?.number })
     // Emit event or trigger workflow
   }
 
   /**
    * Handle workflow run event
    */
-  private async handleWorkflowRunEvent(event: any): Promise<void> {
-    this.debug('Workflow run event', { action: event.action, status: event.workflow_run?.status });
+  private async handleWorkflowRunEvent(event: GitHubWorkflowRunWebhookEvent): Promise<void> {
+    this.debug('Workflow run event', { action: event.action, status: event.workflow_run?.status })
     // Emit event or trigger workflow
   }
 
   /**
    * Handle installation event
    */
-  private async handleInstallationEvent(event: any): Promise<void> {
-    this.debug('Installation event', { action: event.action });
+  private async handleInstallationEvent(event: GitHubInstallationWebhookEvent): Promise<void> {
+    this.debug('Installation event', { action: event.action })
 
     if (event.action === 'deleted' || event.action === 'suspend') {
-      this.setStatus('Suspended', 'GitHub App installation was removed or suspended');
+      this.setStatus('Suspended', 'GitHub App installation was removed or suspended')
     }
   }
 }
 
 // =============================================================================
-// Type Definitions for GitHub Client (Simplified)
+// Type Definitions for GitHub Client
 // =============================================================================
 
 /**
- * Simplified GitHub client interface
- * In production, use @octokit/rest
+ * GitHub user object
+ */
+interface GitHubUser {
+  login: string
+  id: number
+}
+
+/**
+ * GitHub label object
+ */
+interface GitHubLabel {
+  name: string
+  color?: string
+}
+
+/**
+ * GitHub installation response
+ */
+interface GitHubInstallationResponse {
+  id: number
+  permissions: GitHubInstallationPermissions
+}
+
+/**
+ * GitHub installation permissions
+ */
+interface GitHubInstallationPermissions {
+  contents?: 'read' | 'write'
+  pull_requests?: 'read' | 'write'
+  issues?: 'read' | 'write'
+  actions?: 'read' | 'write'
+  webhooks?: 'read' | 'write'
+}
+
+/**
+ * GitHub installation access token response
+ */
+interface GitHubInstallationAccessTokenResponse {
+  token: string
+  expires_at: string
+}
+
+/**
+ * GitHub repository response
+ */
+interface GitHubRepositoryResponse {
+  id: number
+  name: string
+  full_name: string
+  default_branch: string
+  private: boolean
+  description?: string
+  url: string
+  clone_url: string
+}
+
+/**
+ * GitHub content response (file)
+ */
+interface GitHubFileContentResponse {
+  path: string
+  sha: string
+  size: number
+  type: 'file'
+  content: string
+  encoding: string
+  url: string
+  download_url?: string
+}
+
+/**
+ * GitHub content response (directory item)
+ */
+interface GitHubDirectoryItemResponse {
+  path: string
+  sha: string
+  size: number
+  type: 'file' | 'dir' | 'symlink' | 'submodule'
+  url: string
+  download_url?: string
+}
+
+/**
+ * GitHub create/update file parameters
+ */
+interface GitHubCreateOrUpdateFileParams {
+  owner: string
+  repo: string
+  path: string
+  message: string
+  content: string
+  sha?: string
+  branch?: string
+  author?: { name: string; email: string }
+  committer?: { name: string; email: string }
+}
+
+/**
+ * GitHub create/update file response
+ */
+interface GitHubCreateOrUpdateFileResponse {
+  commit: GitHubCommitResponse
+}
+
+/**
+ * GitHub delete file parameters
+ */
+interface GitHubDeleteFileParams {
+  owner: string
+  repo: string
+  path: string
+  message: string
+  sha: string
+  branch?: string
+  author?: { name: string; email: string }
+  committer?: { name: string; email: string }
+}
+
+/**
+ * GitHub delete file response
+ */
+interface GitHubDeleteFileResponse {
+  commit: GitHubCommitResponse
+}
+
+/**
+ * GitHub git ref response
+ */
+interface GitHubRefResponse {
+  object: {
+    sha: string
+    type: string
+  }
+}
+
+/**
+ * GitHub commit response
+ */
+interface GitHubCommitResponse {
+  sha: string
+  message: string
+  author: { name: string; email: string; date: string }
+  committer: { name: string; email: string; date: string }
+  url: string
+  tree: { sha: string }
+}
+
+/**
+ * GitHub blob response
+ */
+interface GitHubBlobResponse {
+  sha: string
+  url: string
+}
+
+/**
+ * GitHub tree item
+ */
+interface GitHubTreeItem {
+  path: string
+  mode: '100644' | '100755' | '040000' | '160000' | '120000'
+  type: 'blob' | 'tree' | 'commit'
+  sha: string
+}
+
+/**
+ * GitHub create tree parameters
+ */
+interface GitHubCreateTreeParams {
+  owner: string
+  repo: string
+  base_tree?: string
+  tree: GitHubTreeItem[]
+}
+
+/**
+ * GitHub tree response
+ */
+interface GitHubTreeResponse {
+  sha: string
+  tree: GitHubTreeItem[]
+}
+
+/**
+ * GitHub create commit parameters
+ */
+interface GitHubCreateCommitParams {
+  owner: string
+  repo: string
+  message: string
+  tree: string
+  parents: string[]
+  author?: { name: string; email: string }
+  committer?: { name: string; email: string }
+}
+
+/**
+ * GitHub update ref parameters
+ */
+interface GitHubUpdateRefParams {
+  owner: string
+  repo: string
+  ref: string
+  sha: string
+  force?: boolean
+}
+
+/**
+ * GitHub pull request response
+ */
+interface GitHubPullRequestResponse {
+  id: number
+  number: number
+  title: string
+  body?: string
+  state: 'open' | 'closed'
+  head: { ref: string; sha: string }
+  base: { ref: string; sha: string }
+  draft: boolean
+  merged: boolean
+  mergeable?: boolean
+  url: string
+  html_url: string
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * GitHub create pull request parameters
+ */
+interface GitHubCreatePullRequestParams {
+  owner: string
+  repo: string
+  title: string
+  body?: string
+  head: string
+  base: string
+  draft?: boolean
+  maintainer_can_modify?: boolean
+}
+
+/**
+ * GitHub list pull requests parameters
+ */
+interface GitHubListPullRequestsParams {
+  owner: string
+  repo: string
+  state?: 'open' | 'closed' | 'all'
+  per_page?: number
+}
+
+/**
+ * GitHub merge pull request parameters
+ */
+interface GitHubMergePullRequestParams {
+  owner: string
+  repo: string
+  pull_number: number
+  commit_title?: string
+  commit_message?: string
+  merge_method?: 'merge' | 'squash' | 'rebase'
+}
+
+/**
+ * GitHub merge pull request response
+ */
+interface GitHubMergePullRequestResponse {
+  merged: boolean
+  sha?: string
+  message: string
+}
+
+/**
+ * GitHub issue response
+ */
+interface GitHubIssueResponse {
+  id: number
+  number: number
+  title: string
+  body?: string
+  state: 'open' | 'closed'
+  labels: GitHubLabel[]
+  assignees: GitHubUser[]
+  url: string
+  html_url: string
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * GitHub create issue parameters
+ */
+interface GitHubCreateIssueParams {
+  owner: string
+  repo: string
+  title: string
+  body?: string
+  labels?: string[]
+  assignees?: string[]
+}
+
+/**
+ * GitHub list issues parameters
+ */
+interface GitHubListIssuesParams {
+  owner: string
+  repo: string
+  state?: 'open' | 'closed' | 'all'
+  labels?: string
+  per_page?: number
+}
+
+/**
+ * GitHub push webhook event
+ */
+interface GitHubPushWebhookEvent {
+  ref: string
+  after: string
+  commits?: Array<{ id: string; message: string }>
+}
+
+/**
+ * GitHub pull request webhook event
+ */
+interface GitHubPullRequestWebhookEvent {
+  action: string
+  number: number
+  pull_request?: GitHubPullRequestResponse
+}
+
+/**
+ * GitHub issues webhook event
+ */
+interface GitHubIssuesWebhookEvent {
+  action: string
+  issue?: { number: number }
+}
+
+/**
+ * GitHub workflow run webhook event
+ */
+interface GitHubWorkflowRunWebhookEvent {
+  action: string
+  workflow_run?: { status: string; conclusion?: string }
+}
+
+/**
+ * GitHub installation webhook event
+ */
+interface GitHubInstallationWebhookEvent {
+  action: 'created' | 'deleted' | 'suspend' | 'unsuspend'
+}
+
+/**
+ * GitHub client interface
+ * Matches the official Octokit SDK structure
  */
 interface GitHubClient {
   apps: {
-    getInstallation(installationId: string): Promise<any>;
-    createInstallationAccessToken(installationId: string): Promise<any>;
-  };
+    getInstallation(installationId: string): Promise<GitHubInstallationResponse>
+    createInstallationAccessToken(installationId: string): Promise<GitHubInstallationAccessTokenResponse>
+  }
   repos: {
-    get(params: { owner: string; repo: string }): Promise<any>;
-    getContent(params: { owner: string; repo: string; path: string; ref?: string }): Promise<any>;
-    createOrUpdateFile(params: any): Promise<any>;
-    deleteFile(params: any): Promise<any>;
-  };
+    get(params: { owner: string; repo: string }): Promise<GitHubRepositoryResponse>
+    getContent(params: { owner: string; repo: string; path: string; ref?: string }): Promise<GitHubFileContentResponse | GitHubDirectoryItemResponse[]>
+    createOrUpdateFile(params: GitHubCreateOrUpdateFileParams): Promise<GitHubCreateOrUpdateFileResponse>
+    deleteFile(params: GitHubDeleteFileParams): Promise<GitHubDeleteFileResponse>
+  }
   git: {
-    getRef(params: { owner: string; repo: string; ref: string }): Promise<any>;
-    getCommit(params: { owner: string; repo: string; commit_sha: string }): Promise<any>;
-    createBlob(params: { owner: string; repo: string; content: string; encoding: string }): Promise<any>;
-    createTree(params: any): Promise<any>;
-    createCommit(params: any): Promise<any>;
-    updateRef(params: any): Promise<any>;
-  };
+    getRef(params: { owner: string; repo: string; ref: string }): Promise<GitHubRefResponse>
+    getCommit(params: { owner: string; repo: string; commit_sha: string }): Promise<GitHubCommitResponse>
+    createBlob(params: { owner: string; repo: string; content: string; encoding: string }): Promise<GitHubBlobResponse>
+    createTree(params: GitHubCreateTreeParams): Promise<GitHubTreeResponse>
+    createCommit(params: GitHubCreateCommitParams): Promise<GitHubCommitResponse>
+    updateRef(params: GitHubUpdateRefParams): Promise<GitHubRefResponse>
+  }
   pulls: {
-    create(params: any): Promise<any>;
-    list(params: any): Promise<any[]>;
-    merge(params: any): Promise<any>;
-  };
+    create(params: GitHubCreatePullRequestParams): Promise<GitHubPullRequestResponse>
+    list(params: GitHubListPullRequestsParams): Promise<GitHubPullRequestResponse[]>
+    merge(params: GitHubMergePullRequestParams): Promise<GitHubMergePullRequestResponse>
+  }
   issues: {
-    create(params: any): Promise<any>;
-    list(params: any): Promise<any[]>;
-  };
+    create(params: GitHubCreateIssueParams): Promise<GitHubIssueResponse>
+    list(params: GitHubListIssuesParams): Promise<GitHubIssueResponse[]>
+  }
 }
 
 // =============================================================================

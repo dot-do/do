@@ -346,9 +346,7 @@ export {
   // rpc.do re-exports
   RPC,
   http,
-  ws,
   capnweb,
-  composite,
   binding,
   // Error class
   RPCError,

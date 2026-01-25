@@ -1018,7 +1018,7 @@ class CloudflareIntegration extends BaseIntegration<CloudflareDeepIntegration> {
   /**
    * Map zone API response to our format
    */
-  private mapZone(zone: any): Zone {
+  private mapZone(zone: CloudflareZoneResponse): Zone {
     return {
       id: zone.id,
       name: zone.name,
@@ -1028,13 +1028,13 @@ class CloudflareIntegration extends BaseIntegration<CloudflareDeepIntegration> {
       nameServers: zone.name_servers,
       createdOn: zone.created_on,
       modifiedOn: zone.modified_on,
-    };
+    }
   }
 
   /**
    * Map DNS record API response to our format
    */
-  private mapDNSRecord(record: any): DNSRecord {
+  private mapDNSRecord(record: CloudflareDNSRecordResponse): DNSRecord {
     return {
       id: record.id,
       zoneId: record.zone_id,
@@ -1048,116 +1048,373 @@ class CloudflareIntegration extends BaseIntegration<CloudflareDeepIntegration> {
       priority: record.priority,
       createdOn: record.created_on,
       modifiedOn: record.modified_on,
-    };
+    }
   }
 
   /**
    * Map binding to API format
    */
-  private mapBindingToApi(binding: WorkerBinding): any {
+  private mapBindingToApi(binding: WorkerBinding): CloudflareWorkerBindingApi {
     switch (binding.type) {
       case 'kv_namespace':
-        return { type: 'kv_namespace', name: binding.name, namespace_id: binding.namespaceId };
+        return { type: 'kv_namespace', name: binding.name, namespace_id: binding.namespaceId }
       case 'r2_bucket':
-        return { type: 'r2_bucket', name: binding.name, bucket_name: binding.bucketName };
+        return { type: 'r2_bucket', name: binding.name, bucket_name: binding.bucketName }
       case 'd1_database':
-        return { type: 'd1', name: binding.name, id: binding.databaseId };
+        return { type: 'd1', name: binding.name, id: binding.databaseId }
       case 'durable_object':
         return {
           type: 'durable_object_namespace',
           name: binding.name,
           class_name: binding.className,
           script_name: binding.scriptName,
-        };
+        }
       case 'service':
         return {
           type: 'service',
           name: binding.name,
           service: binding.service,
           environment: binding.environment,
-        };
+        }
       case 'secret':
-        return { type: 'secret_text', name: binding.name, text: binding.value };
+        return { type: 'secret_text', name: binding.name, text: binding.value }
       case 'plain_text':
-        return { type: 'plain_text', name: binding.name, text: binding.value };
-      default:
-        return binding;
+        return { type: 'plain_text', name: binding.name, text: binding.value }
     }
   }
 }
 
 // =============================================================================
-// Type Definitions for Cloudflare Client (Simplified)
+// Type Definitions for Cloudflare Client
 // =============================================================================
 
 /**
- * Simplified Cloudflare client interface
- * In production, use the official cloudflare SDK
+ * Cloudflare token verification response
+ */
+interface CloudflareTokenVerifyResponse {
+  status: 'active' | 'disabled' | 'expired'
+}
+
+/**
+ * Cloudflare zone creation parameters
+ */
+interface CloudflareZoneCreateParams {
+  name: string
+  account: { id: string }
+  type?: 'full' | 'partial'
+  jump_start?: boolean
+}
+
+/**
+ * Cloudflare zone response
+ */
+interface CloudflareZoneResponse {
+  id: string
+  name: string
+  status: 'active' | 'pending' | 'initializing' | 'moved' | 'deleted' | 'deactivated'
+  paused: boolean
+  type: 'full' | 'partial'
+  name_servers: string[]
+  created_on: string
+  modified_on: string
+}
+
+/**
+ * Cloudflare zone list parameters
+ */
+interface CloudflareZoneListParams {
+  account: { id: string }
+}
+
+/**
+ * Cloudflare zone list response
+ */
+interface CloudflareZoneListResponse {
+  result: CloudflareZoneResponse[]
+}
+
+/**
+ * Cloudflare DNS record creation parameters
+ */
+interface CloudflareDNSRecordCreateParams {
+  type: DNSRecordType
+  name: string
+  content: string
+  ttl?: number
+  proxied?: boolean
+  priority?: number
+}
+
+/**
+ * Cloudflare DNS record response
+ */
+interface CloudflareDNSRecordResponse {
+  id: string
+  zone_id: string
+  zone_name: string
+  name: string
+  type: DNSRecordType
+  content: string
+  proxied: boolean
+  proxiable: boolean
+  ttl: number
+  priority?: number
+  created_on: string
+  modified_on: string
+}
+
+/**
+ * Cloudflare DNS record list parameters
+ */
+interface CloudflareDNSRecordListParams {
+  type?: DNSRecordType
+  name?: string
+}
+
+/**
+ * Cloudflare DNS record list response
+ */
+interface CloudflareDNSRecordListResponse {
+  result: CloudflareDNSRecordResponse[]
+}
+
+/**
+ * Cloudflare worker script update parameters
+ */
+interface CloudflareWorkerScriptUpdateParams {
+  script: string
+  bindings?: CloudflareWorkerBindingApi[]
+  compatibility_date?: string
+  compatibility_flags?: string[]
+}
+
+/**
+ * Cloudflare worker binding API format
+ */
+type CloudflareWorkerBindingApi =
+  | { type: 'kv_namespace'; name: string; namespace_id: string }
+  | { type: 'r2_bucket'; name: string; bucket_name: string }
+  | { type: 'd1'; name: string; id: string }
+  | { type: 'durable_object_namespace'; name: string; class_name: string; script_name?: string }
+  | { type: 'service'; name: string; service: string; environment?: string }
+  | { type: 'secret_text'; name: string; text: string }
+  | { type: 'plain_text'; name: string; text: string }
+
+/**
+ * Cloudflare worker script response
+ */
+interface CloudflareWorkerScriptResponse {
+  id: string
+  etag?: string
+  created_on: string
+  modified_on: string
+}
+
+/**
+ * Cloudflare worker route creation parameters
+ */
+interface CloudflareWorkerRouteCreateParams {
+  pattern: string
+  script: string
+}
+
+/**
+ * Cloudflare worker route response
+ */
+interface CloudflareWorkerRouteResponse {
+  id: string
+  pattern: string
+  script: string
+}
+
+/**
+ * Cloudflare worker cron update parameters
+ */
+interface CloudflareWorkerCronUpdateParams {
+  crons: Array<{ cron: string }>
+}
+
+/**
+ * Cloudflare KV namespace creation parameters
+ */
+interface CloudflareKVNamespaceCreateParams {
+  title: string
+}
+
+/**
+ * Cloudflare KV namespace response
+ */
+interface CloudflareKVNamespaceResponse {
+  id: string
+  title: string
+  supports_url_encoding: boolean
+}
+
+/**
+ * Cloudflare KV namespace list response
+ */
+interface CloudflareKVNamespaceListResponse {
+  result: CloudflareKVNamespaceResponse[]
+}
+
+/**
+ * Cloudflare KV put options
+ */
+interface CloudflareKVPutOptions {
+  expiration?: number
+  expirationTtl?: number
+  metadata?: Record<string, unknown>
+}
+
+/**
+ * Cloudflare R2 bucket creation parameters
+ */
+interface CloudflareR2BucketCreateParams {
+  name: string
+  locationHint?: string
+}
+
+/**
+ * Cloudflare R2 bucket response
+ */
+interface CloudflareR2BucketResponse {
+  name: string
+  creation_date: string
+  location?: string
+}
+
+/**
+ * Cloudflare R2 bucket list response
+ */
+interface CloudflareR2BucketListResponse {
+  result: CloudflareR2BucketResponse[]
+}
+
+/**
+ * Cloudflare D1 database creation parameters
+ */
+interface CloudflareD1DatabaseCreateParams {
+  name: string
+}
+
+/**
+ * Cloudflare D1 database response
+ */
+interface CloudflareD1DatabaseResponse {
+  uuid: string
+  name: string
+  version: string
+  num_tables: number
+  file_size: number
+  created_at: string
+}
+
+/**
+ * Cloudflare D1 database list response
+ */
+interface CloudflareD1DatabaseListResponse {
+  result: CloudflareD1DatabaseResponse[]
+}
+
+/**
+ * Cloudflare D1 query parameters
+ */
+interface CloudflareD1QueryParams {
+  sql: string
+  params?: unknown[]
+}
+
+/**
+ * Cloudflare D1 query response
+ */
+interface CloudflareD1QueryResponse {
+  results: Record<string, unknown>[]
+  meta: {
+    changes: number
+    last_row_id: number
+  }
+}
+
+/**
+ * Cloudflare SSL certificate response
+ */
+interface CloudflareSSLCertificateResponse {
+  id: string
+  type: string
+  hosts: string[]
+  status: 'active' | 'pending_validation' | 'pending_issuance' | 'pending_deployment'
+  issuer: string
+  expires_on: string
+}
+
+/**
+ * Cloudflare client interface
+ * Matches the official Cloudflare SDK structure
  */
 interface CloudflareClient {
   user: {
     tokens: {
-      verify(): Promise<any>;
-    };
-  };
+      verify(): Promise<CloudflareTokenVerifyResponse>
+    }
+  }
   zones: {
-    create(params: any): Promise<any>;
-    get(zoneId: string): Promise<any>;
-    list(params: any): Promise<any>;
-    delete(zoneId: string): Promise<void>;
-  };
+    create(params: CloudflareZoneCreateParams): Promise<CloudflareZoneResponse>
+    get(zoneId: string): Promise<CloudflareZoneResponse>
+    list(params: CloudflareZoneListParams): Promise<CloudflareZoneListResponse>
+    delete(zoneId: string): Promise<void>
+  }
   dns: {
     records: {
-      create(zoneId: string, params: any): Promise<any>;
-      list(zoneId: string, params?: any): Promise<any>;
-      update(zoneId: string, recordId: string, params: any): Promise<any>;
-      delete(zoneId: string, recordId: string): Promise<void>;
-    };
-  };
+      create(zoneId: string, params: CloudflareDNSRecordCreateParams): Promise<CloudflareDNSRecordResponse>
+      list(zoneId: string, params?: CloudflareDNSRecordListParams): Promise<CloudflareDNSRecordListResponse>
+      update(zoneId: string, recordId: string, params: Partial<CloudflareDNSRecordCreateParams>): Promise<CloudflareDNSRecordResponse>
+      delete(zoneId: string, recordId: string): Promise<void>
+    }
+  }
   workers: {
     scripts: {
-      get(accountId: string, scriptName: string): Promise<any>;
-      update(accountId: string, scriptName: string, params: any): Promise<any>;
-      delete(accountId: string, scriptName: string): Promise<void>;
-    };
+      get(accountId: string, scriptName: string): Promise<CloudflareWorkerScriptResponse>
+      update(accountId: string, scriptName: string, params: CloudflareWorkerScriptUpdateParams): Promise<CloudflareWorkerScriptResponse>
+      delete(accountId: string, scriptName: string): Promise<void>
+    }
     routes: {
-      create(accountId: string, params: any): Promise<any>;
-    };
+      create(accountId: string, params: CloudflareWorkerRouteCreateParams): Promise<CloudflareWorkerRouteResponse>
+    }
     crons: {
-      update(accountId: string, scriptName: string, params: any): Promise<any>;
-    };
-  };
+      update(accountId: string, scriptName: string, params: CloudflareWorkerCronUpdateParams): Promise<void>
+    }
+  }
   kv: {
     namespaces: {
-      create(accountId: string, params: any): Promise<any>;
-      list(accountId: string): Promise<any>;
+      create(accountId: string, params: CloudflareKVNamespaceCreateParams): Promise<CloudflareKVNamespaceResponse>
+      list(accountId: string): Promise<CloudflareKVNamespaceListResponse>
       values: {
-        put(accountId: string, namespaceId: string, key: string, value: any, options?: any): Promise<void>;
-        get(accountId: string, namespaceId: string, key: string): Promise<string | null>;
-        delete(accountId: string, namespaceId: string, key: string): Promise<void>;
-      };
-    };
-  };
+        put(accountId: string, namespaceId: string, key: string, value: string | ArrayBuffer, options?: CloudflareKVPutOptions): Promise<void>
+        get(accountId: string, namespaceId: string, key: string): Promise<string | null>
+        delete(accountId: string, namespaceId: string, key: string): Promise<void>
+      }
+    }
+  }
   r2: {
     buckets: {
-      create(accountId: string, params: any): Promise<any>;
-      list(accountId: string): Promise<any>;
-      delete(accountId: string, bucketName: string): Promise<void>;
-    };
-  };
+      create(accountId: string, params: CloudflareR2BucketCreateParams): Promise<CloudflareR2BucketResponse>
+      list(accountId: string): Promise<CloudflareR2BucketListResponse>
+      delete(accountId: string, bucketName: string): Promise<void>
+    }
+  }
   d1: {
     databases: {
-      create(accountId: string, params: any): Promise<any>;
-      list(accountId: string): Promise<any>;
-      query(accountId: string, databaseId: string, params: any): Promise<any>;
-      delete(accountId: string, databaseId: string): Promise<void>;
-    };
-  };
+      create(accountId: string, params: CloudflareD1DatabaseCreateParams): Promise<CloudflareD1DatabaseResponse>
+      list(accountId: string): Promise<CloudflareD1DatabaseListResponse>
+      query(accountId: string, databaseId: string, params: CloudflareD1QueryParams): Promise<CloudflareD1QueryResponse>
+      delete(accountId: string, databaseId: string): Promise<void>
+    }
+  }
   ssl: {
     certificates: {
-      get(zoneId: string): Promise<any>;
-    };
-  };
+      get(zoneId: string): Promise<CloudflareSSLCertificateResponse>
+    }
+  }
 }
 
 // =============================================================================

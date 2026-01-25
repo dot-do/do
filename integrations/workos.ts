@@ -737,7 +737,7 @@ class WorkOSIntegration extends BaseIntegration<WorkOSDeepIntegration> {
     });
 
     return {
-      events: result.data.map((e: { id: string; action: string; occurred_at: string; actor?: any; targets?: any[]; metadata?: Record<string, unknown> }) => ({
+      events: result.data.map((e: WorkOSAuditLogEventResponse) => ({
         id: e.id,
         action: e.action,
         occurredAt: new Date(e.occurred_at).getTime(),
@@ -803,7 +803,7 @@ class WorkOSIntegration extends BaseIntegration<WorkOSDeepIntegration> {
   /**
    * Map API user to DirectoryUser
    */
-  private mapDirectoryUser(user: any): DirectoryUser {
+  private mapDirectoryUser = (user: WorkOSDirectoryUserResponse): DirectoryUser => {
     return {
       id: user.id,
       directoryId: user.directory_id,
@@ -814,25 +814,25 @@ class WorkOSIntegration extends BaseIntegration<WorkOSDeepIntegration> {
       state: user.state,
       groups: user.groups?.map(this.mapDirectoryGroup) ?? [],
       customAttributes: user.custom_attributes,
-    };
+    }
   }
 
   /**
    * Map API group to DirectoryGroup
    */
-  private mapDirectoryGroup(group: any): DirectoryGroup {
+  private mapDirectoryGroup = (group: WorkOSDirectoryGroupResponse): DirectoryGroup => {
     return {
       id: group.id,
       directoryId: group.directory_id,
       name: group.name,
       rawAttributes: group.raw_attributes,
-    };
+    }
   }
 
   /**
    * Handle directory user events
    */
-  private async handleDirectoryUserEvent(event: any): Promise<void> {
+  private async handleDirectoryUserEvent(event: WorkOSWebhookEvent): Promise<void> {
     this.debug('Directory user event', { type: event.event, userId: event.data?.id });
     // Emit event or trigger sync
   }
@@ -840,7 +840,7 @@ class WorkOSIntegration extends BaseIntegration<WorkOSDeepIntegration> {
   /**
    * Handle directory group events
    */
-  private async handleDirectoryGroupEvent(event: any): Promise<void> {
+  private async handleDirectoryGroupEvent(event: WorkOSWebhookEvent): Promise<void> {
     this.debug('Directory group event', { type: event.event, groupId: event.data?.id });
     // Emit event or trigger sync
   }
@@ -848,7 +848,7 @@ class WorkOSIntegration extends BaseIntegration<WorkOSDeepIntegration> {
   /**
    * Handle group membership events
    */
-  private async handleGroupMembershipEvent(event: any): Promise<void> {
+  private async handleGroupMembershipEvent(event: WorkOSWebhookEvent): Promise<void> {
     this.debug('Group membership event', { type: event.event });
     // Emit event or trigger sync
   }
@@ -856,43 +856,294 @@ class WorkOSIntegration extends BaseIntegration<WorkOSDeepIntegration> {
   /**
    * Handle connection events
    */
-  private async handleConnectionEvent(event: any): Promise<void> {
+  private async handleConnectionEvent(event: WorkOSWebhookEvent): Promise<void> {
     this.debug('Connection event', { type: event.event, connectionId: event.data?.id });
     // Update state based on connection status
   }
 }
 
 // =============================================================================
-// Type Definitions for WorkOS Client (Simplified)
+// Type Definitions for WorkOS Client
 // =============================================================================
 
 /**
- * Simplified WorkOS client interface
- * In production, use the official WorkOS SDK
+ * WorkOS organization creation parameters
+ */
+interface WorkOSCreateOrganizationParams {
+  name: string
+  domains?: string[]
+  allow_profiles_outside_organization?: boolean
+}
+
+/**
+ * WorkOS organization response
+ */
+interface WorkOSOrganizationResponse {
+  id: string
+  name: string
+  domains?: Array<{ id: string; domain: string }>
+}
+
+/**
+ * WorkOS SSO connection creation parameters
+ */
+interface WorkOSSSOConnectionParams {
+  organizationId: string
+  provider: SSOProvider
+  name?: string
+  domains?: string[]
+}
+
+/**
+ * WorkOS SSO connection response
+ */
+interface WorkOSSSOConnectionResponse {
+  id: string
+  connection_type: string
+  name: string
+  state: string
+}
+
+/**
+ * WorkOS SSO list connections parameters
+ */
+interface WorkOSSSOListConnectionsParams {
+  organizationId: string
+}
+
+/**
+ * WorkOS SSO list connections response
+ */
+interface WorkOSSSOListConnectionsResponse {
+  data: WorkOSSSOConnectionResponse[]
+}
+
+/**
+ * WorkOS SSO authorization URL parameters
+ */
+interface WorkOSSSOAuthUrlParams {
+  connection: string
+  redirectUri: string
+  state: string
+}
+
+/**
+ * WorkOS SSO profile and token parameters
+ */
+interface WorkOSSSOProfileTokenParams {
+  code: string
+}
+
+/**
+ * WorkOS SSO profile response
+ */
+interface WorkOSSSOProfileResponse {
+  profile: {
+    id: string
+    connection_id: string
+    connection_type: string
+    organization_id: string
+    email: string
+    first_name?: string
+    last_name?: string
+    raw_attributes?: Record<string, unknown>
+  }
+  access_token: string
+}
+
+/**
+ * WorkOS directory creation parameters
+ */
+interface WorkOSDirectoryCreateParams {
+  organizationId: string
+  type: DirectoryProvider
+  name?: string
+  domains?: string[]
+}
+
+/**
+ * WorkOS directory response
+ */
+interface WorkOSDirectoryResponse {
+  id: string
+  name: string
+  type: string
+}
+
+/**
+ * WorkOS directory list users parameters
+ */
+interface WorkOSDirectoryListUsersParams {
+  directoryId: string
+  limit?: number
+  after?: string
+}
+
+/**
+ * WorkOS directory user response (from API)
+ */
+interface WorkOSDirectoryUserResponse {
+  id: string
+  directory_id: string
+  email: string
+  first_name?: string
+  last_name?: string
+  username?: string
+  state: 'active' | 'inactive'
+  groups?: WorkOSDirectoryGroupResponse[]
+  custom_attributes?: Record<string, unknown>
+}
+
+/**
+ * WorkOS directory list users response
+ */
+interface WorkOSDirectoryListUsersResponse {
+  data: WorkOSDirectoryUserResponse[]
+  list_metadata?: { after?: string }
+}
+
+/**
+ * WorkOS directory list groups parameters
+ */
+interface WorkOSDirectoryListGroupsParams {
+  directoryId: string
+  limit?: number
+  after?: string
+}
+
+/**
+ * WorkOS directory group response (from API)
+ */
+interface WorkOSDirectoryGroupResponse {
+  id: string
+  directory_id: string
+  name: string
+  raw_attributes?: Record<string, unknown>
+}
+
+/**
+ * WorkOS directory list groups response
+ */
+interface WorkOSDirectoryListGroupsResponse {
+  data: WorkOSDirectoryGroupResponse[]
+  list_metadata?: { after?: string }
+}
+
+/**
+ * WorkOS portal link parameters
+ */
+interface WorkOSPortalLinkParams {
+  organizationId: string
+  intent: 'sso' | 'dsync'
+  returnUrl?: string
+}
+
+/**
+ * WorkOS portal link response
+ */
+interface WorkOSPortalLinkResponse {
+  link: string
+}
+
+/**
+ * WorkOS audit log actor
+ */
+interface WorkOSAuditLogActor {
+  id: string
+  name?: string
+  type: string
+}
+
+/**
+ * WorkOS audit log target
+ */
+interface WorkOSAuditLogTarget {
+  id: string
+  name?: string
+  type: string
+}
+
+/**
+ * WorkOS audit log event creation parameters
+ */
+interface WorkOSAuditLogEventCreateParams {
+  organizationId: string
+  event: {
+    action: string
+    actor?: WorkOSAuditLogActor
+    targets?: WorkOSAuditLogTarget[]
+    metadata?: Record<string, unknown>
+  }
+}
+
+/**
+ * WorkOS audit log list events parameters
+ */
+interface WorkOSAuditLogListEventsParams {
+  organizationId: string
+  limit?: number
+  after?: string
+  actions?: string[]
+}
+
+/**
+ * WorkOS audit log event response (from API)
+ */
+interface WorkOSAuditLogEventResponse {
+  id: string
+  action: string
+  occurred_at: string
+  actor?: WorkOSAuditLogActor
+  targets?: WorkOSAuditLogTarget[]
+  metadata?: Record<string, unknown>
+}
+
+/**
+ * WorkOS audit log list events response
+ */
+interface WorkOSAuditLogListEventsResponse {
+  data: WorkOSAuditLogEventResponse[]
+  list_metadata?: { after?: string }
+}
+
+/**
+ * WorkOS webhook event
+ */
+interface WorkOSWebhookEvent {
+  event: string
+  data?: {
+    id?: string
+    [key: string]: unknown
+  }
+}
+
+/**
+ * WorkOS client interface
+ * Matches the official WorkOS SDK structure
  */
 interface WorkOSClient {
   organizations: {
-    create(params: any): Promise<any>;
-    get(id: string): Promise<any>;
-  };
+    create(params: WorkOSCreateOrganizationParams): Promise<WorkOSOrganizationResponse>
+    get(id: string): Promise<WorkOSOrganizationResponse>
+  }
   sso: {
-    createConnection(params: any): Promise<any>;
-    listConnections(params: any): Promise<any>;
-    getAuthorizationUrl(params: any): Promise<string>;
-    getProfileAndToken(params: any): Promise<any>;
-  };
+    createConnection(params: WorkOSSSOConnectionParams): Promise<WorkOSSSOConnectionResponse>
+    listConnections(params: WorkOSSSOListConnectionsParams): Promise<WorkOSSSOListConnectionsResponse>
+    getAuthorizationUrl(params: WorkOSSSOAuthUrlParams): Promise<string>
+    getProfileAndToken(params: WorkOSSSOProfileTokenParams): Promise<WorkOSSSOProfileResponse>
+  }
   directorySync: {
-    createDirectory(params: any): Promise<any>;
-    listUsers(params: any): Promise<any>;
-    listGroups(params: any): Promise<any>;
-  };
+    createDirectory(params: WorkOSDirectoryCreateParams): Promise<WorkOSDirectoryResponse>
+    listUsers(params: WorkOSDirectoryListUsersParams): Promise<WorkOSDirectoryListUsersResponse>
+    listGroups(params: WorkOSDirectoryListGroupsParams): Promise<WorkOSDirectoryListGroupsResponse>
+  }
   portal: {
-    generateLink(params: any): Promise<any>;
-  };
+    generateLink(params: WorkOSPortalLinkParams): Promise<WorkOSPortalLinkResponse>
+  }
   auditLogs: {
-    createEvent(params: any): Promise<void>;
-    listEvents(params: any): Promise<any>;
-  };
+    createEvent(params: WorkOSAuditLogEventCreateParams): Promise<void>
+    listEvents(params: WorkOSAuditLogListEventsParams): Promise<WorkOSAuditLogListEventsResponse>
+  }
 }
 
 // =============================================================================

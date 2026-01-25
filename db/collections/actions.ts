@@ -276,7 +276,7 @@ export class ActionCollection extends BaseCollection<any> {
       object: data.object,
       input: data.input,
       config: data.config,
-      status: 'pending' as unknown as ActionStatus,
+      status: 'pending',
       actor: data.actor,
       request: data.request,
       createdAt: now,
@@ -320,7 +320,7 @@ export class ActionCollection extends BaseCollection<any> {
     const now = this.now()
     const updated: Action = {
       ...action,
-      status: 'running' as unknown as ActionStatus,
+      status: 'running',
       startedAt: action.startedAt ?? now,
       updatedAt: now,
     }
@@ -364,7 +364,7 @@ export class ActionCollection extends BaseCollection<any> {
     const now = this.now()
     const updated: Action = {
       ...action,
-      status: 'completed' as unknown as ActionStatus,
+      status: 'completed',
       output,
       completedAt: now,
       updatedAt: now,
@@ -422,12 +422,12 @@ export class ActionCollection extends BaseCollection<any> {
 
     // Determine if we should retry
     const canRetry = error.retryable && retryCount <= this.retryPolicy.maxAttempts
-    const newStatus = canRetry ? 'retrying' : 'failed'
+    const newStatus: ActionStatus = canRetry ? 'retrying' : 'failed'
 
     const now = this.now()
     const updated: Action = {
       ...action,
-      status: newStatus as unknown as ActionStatus,
+      status: newStatus,
       error: actionError,
       updatedAt: now,
     }
@@ -468,7 +468,7 @@ export class ActionCollection extends BaseCollection<any> {
     const metadata = { ...(action.metadata ?? {}), ...(reason ? { cancellationReason: reason } : {}) }
     const updated: Action = {
       ...action,
-      status: 'cancelled' as unknown as ActionStatus,
+      status: 'cancelled',
       metadata,
       updatedAt: now,
     }
@@ -504,7 +504,7 @@ export class ActionCollection extends BaseCollection<any> {
     const metadata = { ...(action.metadata ?? {}), dependency }
     const updated: Action = {
       ...action,
-      status: 'blocked' as unknown as ActionStatus,
+      status: 'blocked',
       metadata,
       updatedAt: now,
     }
@@ -538,7 +538,7 @@ export class ActionCollection extends BaseCollection<any> {
     const now = this.now()
     const updated: Action = {
       ...action,
-      status: 'pending' as unknown as ActionStatus,
+      status: 'pending',
       updatedAt: now,
     }
 
@@ -743,24 +743,22 @@ export class ActionCollection extends BaseCollection<any> {
   async getStats(): Promise<Record<ActionStatus, number>> {
     const prefix = `${this.config.name}:`
     const allItems = await this.storage.list<Action>({ prefix })
-    const stats: Record<string, number> = {
-      Pending: 0,
-      Running: 0,
-      Completed: 0,
-      Failed: 0,
-      Cancelled: 0,
-      Retrying: 0,
-      Blocked: 0,
+    const stats: Record<ActionStatus, number> = {
+      pending: 0,
+      running: 0,
+      completed: 0,
+      failed: 0,
+      cancelled: 0,
+      retrying: 0,
+      blocked: 0,
     }
     for (const item of allItems.values()) {
-      const statusLower = String(item.status).toLowerCase()
-      // Map to PascalCase keys
-      const key = statusLower.charAt(0).toUpperCase() + statusLower.slice(1)
-      if (key in stats) {
-        stats[key]++
+      const status = item.status
+      if (status in stats) {
+        stats[status]++
       }
     }
-    return stats as Record<ActionStatus, number>
+    return stats
   }
 
   /**

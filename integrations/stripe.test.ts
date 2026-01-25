@@ -181,7 +181,7 @@ describe('StripeIntegration', () => {
       const state = await integration.connect(connectConfig);
 
       expect(state.type).toBe('stripe');
-      expect(state.status).toBe('pending_auth');
+      expect(state.status).toBe('PendingAuth');
       expect(state.accountId).toBe('acct_test123');
       expect(state.accountType).toBe('express');
       expect(state.onboardingUrl).toBe('https://connect.stripe.com/setup/test');
@@ -261,7 +261,7 @@ describe('StripeIntegration', () => {
       const result = await integration.healthCheck();
 
       expect(result.healthy).toBe(false);
-      expect(result.status).toBe('not_configured');
+      expect(result.status).toBe('NotConfigured');
     });
 
     it('should check account status', async () => {
@@ -274,7 +274,7 @@ describe('StripeIntegration', () => {
       const result = await integration.healthCheck({ detailed: true });
 
       expect(result.healthy).toBe(true);
-      expect(result.status).toBe('active');
+      expect(result.status).toBe('Active');
       expect(result.details).toEqual({
         chargesEnabled: true,
         payoutsEnabled: true,
@@ -340,7 +340,7 @@ describe('StripeIntegration', () => {
       });
       // Set to active status
       const state = await integration.getState();
-      (state as any).status = 'active';
+      (state as any).status = 'Active';
     });
 
     it('should create payment intent', async () => {
@@ -394,7 +394,7 @@ describe('StripeIntegration', () => {
         returnUrl: 'https://example.com/return',
       });
       const state = await integration.getState();
-      (state as any).status = 'active';
+      (state as any).status = 'Active';
     });
 
     it('should create subscription', async () => {
@@ -419,7 +419,7 @@ describe('StripeIntegration', () => {
         returnUrl: 'https://example.com/return',
       });
       const state = await integration.getState();
-      (state as any).status = 'active';
+      (state as any).status = 'Active';
     });
 
     it('should cancel at period end by default', async () => {
@@ -447,7 +447,7 @@ describe('StripeIntegration', () => {
         returnUrl: 'https://example.com/return',
       });
       const state = await integration.getState();
-      (state as any).status = 'active';
+      (state as any).status = 'Active';
     });
 
     it('should retrieve balance', async () => {

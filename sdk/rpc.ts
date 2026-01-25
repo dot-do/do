@@ -21,7 +21,7 @@
  * @module @do/sdk/rpc
  */
 
-import { RPC, http, ws, capnweb, composite, binding, type Transport, type RPCProxy, type AuthProvider } from 'rpc.do'
+import { RPC, http, capnweb, binding, type Transport, type RPCProxy, type AuthProvider } from 'rpc.do'
 import type {
   Noun,
   Verb,
@@ -45,7 +45,7 @@ import type {
 // Re-exports from rpc.do
 // =============================================================================
 
-export { RPC, http, ws, capnweb, composite, binding }
+export { RPC, http, capnweb, binding }
 export type { Transport, RPCProxy, AuthProvider }
 
 // =============================================================================
@@ -278,8 +278,8 @@ export interface DOClientConfig {
   token?: string
   /** Auth provider function for dynamic token retrieval */
   authProvider?: AuthProvider
-  /** Transport type: 'http' | 'ws' | 'capnweb' | 'auto' (default: 'http') */
-  transport?: 'http' | 'ws' | 'capnweb' | 'auto'
+  /** Transport type: 'http' | 'capnweb' | 'auto' (default: 'http') */
+  transport?: 'http' | 'capnweb' | 'auto'
   /** Environment variables to use for config resolution */
   env?: EnvRecord
   /** Enable debug logging */
@@ -343,19 +343,18 @@ export function createDOApiClient(options: DOClientConfig = {}): DOApiClient {
   let transport: Transport
 
   switch (transportType) {
-    case 'ws':
-      transport = ws(endpoint, auth)
-      break
     case 'capnweb':
+      // Use capnweb with WebSocket for persistent connection
       transport = capnweb(endpoint, { websocket: true, auth })
       break
     case 'auto':
-      // Try WebSocket first, fallback to HTTP
-      transport = composite(ws(endpoint, auth), http(endpoint, auth))
+      // Use capnweb with WebSocket for auto mode (persistent connection preferred)
+      transport = capnweb(endpoint, { websocket: true, auth })
       break
     case 'http':
     default:
-      transport = http(endpoint, auth)
+      // Use capnweb without websocket for HTTP mode (stateless requests)
+      transport = capnweb(endpoint, { websocket: false, auth })
   }
 
   if (debug) {

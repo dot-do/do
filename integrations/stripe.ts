@@ -714,63 +714,63 @@ class StripeIntegration extends BaseIntegration<StripeDeepIntegration> {
     payload: string,
     signature: string,
     secret: string
-  ): Promise<{ type: string; data: any }> {
+  ): Promise<StripeWebhookEvent> {
     // In production, use Stripe's constructEvent method
     // This is a placeholder implementation
-    const event = JSON.parse(payload);
-    return event;
+    const event = JSON.parse(payload) as StripeWebhookEvent
+    return event
   }
 
   /**
    * Handle account.updated webhook
    */
-  private async handleAccountUpdated(data: any): Promise<void> {
-    const account = data.object;
+  private async handleAccountUpdated(data: StripeWebhookEventData): Promise<void> {
+    const account = data.object as unknown as StripeAccountObject
 
     this.updateState({
       chargesEnabled: account.charges_enabled,
       payoutsEnabled: account.payouts_enabled,
       status: account.charges_enabled && account.payouts_enabled ? 'Active' : 'PendingAuth',
       lastActivityAt: Date.now(),
-    });
+    })
   }
 
   /**
    * Handle payment_intent.succeeded webhook
    */
-  private async handlePaymentSucceeded(data: any): Promise<void> {
-    this.debug('Payment succeeded', { paymentIntentId: data.object.id });
+  private async handlePaymentSucceeded(data: StripeWebhookEventData): Promise<void> {
+    this.debug('Payment succeeded', { paymentIntentId: data.object.id })
     // Emit event or trigger workflow
   }
 
   /**
    * Handle payment_intent.payment_failed webhook
    */
-  private async handlePaymentFailed(data: any): Promise<void> {
-    this.debug('Payment failed', { paymentIntentId: data.object.id });
+  private async handlePaymentFailed(data: StripeWebhookEventData): Promise<void> {
+    this.debug('Payment failed', { paymentIntentId: data.object.id })
     // Emit event or trigger workflow
   }
 
   /**
    * Handle subscription webhooks
    */
-  private async handleSubscriptionEvent(type: string, data: any): Promise<void> {
-    this.debug('Subscription event', { type, subscriptionId: data.object.id });
+  private async handleSubscriptionEvent(type: string, data: StripeWebhookEventData): Promise<void> {
+    this.debug('Subscription event', { type, subscriptionId: data.object.id })
     // Emit event or trigger workflow
   }
 
   /**
    * Handle payout webhooks
    */
-  private async handlePayoutEvent(type: string, data: any): Promise<void> {
-    this.debug('Payout event', { type, payoutId: data.object.id });
+  private async handlePayoutEvent(type: string, data: StripeWebhookEventData): Promise<void> {
+    this.debug('Payout event', { type, payoutId: data.object.id })
     // Emit event or trigger workflow
   }
 
   /**
    * Map Stripe subscription to our format
    */
-  private mapSubscription(subscription: any): Subscription {
+  private mapSubscription(subscription: StripeSubscriptionResponse): Subscription {
     return {
       id: subscription.id,
       customerId: subscription.customer,
@@ -779,41 +779,225 @@ class StripeIntegration extends BaseIntegration<StripeDeepIntegration> {
       currentPeriodEnd: subscription.current_period_end,
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
       metadata: subscription.metadata,
-    };
+    }
   }
 }
 
 // =============================================================================
-// Type Definitions for Stripe Client (Simplified)
+// Type Definitions for Stripe Client
 // =============================================================================
 
 /**
- * Simplified Stripe client interface
- * In production, use the official Stripe SDK
+ * Stripe account creation parameters
+ */
+interface StripeAccountCreateParams {
+  type: 'standard' | 'express' | 'custom'
+  country?: string
+  email?: string
+  business_profile?: {
+    name?: string
+    url?: string
+    supportEmail?: string
+    supportPhone?: string
+  }
+  capabilities?: {
+    card_payments?: { requested: boolean }
+    transfers?: { requested: boolean }
+    bank_transfer_payments?: { requested: boolean }
+  }
+}
+
+/**
+ * Stripe account response
+ */
+interface StripeAccountResponse {
+  id: string
+  type: 'standard' | 'express' | 'custom'
+  charges_enabled: boolean
+  payouts_enabled: boolean
+  details_submitted: boolean
+}
+
+/**
+ * Stripe account object (from webhook)
+ */
+interface StripeAccountObject {
+  id: string
+  charges_enabled: boolean
+  payouts_enabled: boolean
+  details_submitted?: boolean
+}
+
+/**
+ * Stripe account link creation parameters
+ */
+interface StripeAccountLinkCreateParams {
+  account: string
+  refresh_url: string
+  return_url: string
+  type: 'account_onboarding' | 'account_update'
+}
+
+/**
+ * Stripe account link response
+ */
+interface StripeAccountLinkResponse {
+  url: string
+  expires_at: number
+}
+
+/**
+ * Stripe payment intent creation parameters
+ */
+interface StripePaymentIntentCreateParams {
+  amount: number
+  currency: string
+  description?: string
+  metadata?: Record<string, string>
+  customer?: string
+  application_fee_amount?: number
+  transfer_data?: {
+    destination: string
+    amount?: number
+  }
+}
+
+/**
+ * Stripe payment intent response
+ */
+interface StripePaymentIntentResponse {
+  id: string
+  amount: number
+  currency: string
+  status: 'requires_payment_method' | 'requires_confirmation' | 'requires_action' |
+          'processing' | 'requires_capture' | 'canceled' | 'succeeded'
+  client_secret: string
+  metadata?: Record<string, string>
+}
+
+/**
+ * Stripe subscription creation parameters
+ */
+interface StripeSubscriptionCreateParams {
+  customer: string
+  items: Array<{ price: string; quantity?: number }>
+  trial_period_days?: number
+  metadata?: Record<string, string>
+  application_fee_percent?: number
+}
+
+/**
+ * Stripe subscription update parameters
+ */
+interface StripeSubscriptionUpdateParams {
+  cancel_at_period_end?: boolean
+  metadata?: Record<string, string>
+}
+
+/**
+ * Stripe subscription response
+ */
+interface StripeSubscriptionResponse {
+  id: string
+  customer: string
+  status: 'incomplete' | 'incomplete_expired' | 'trialing' | 'active' |
+          'past_due' | 'canceled' | 'unpaid' | 'paused'
+  current_period_start: number
+  current_period_end: number
+  cancel_at_period_end: boolean
+  metadata?: Record<string, string>
+}
+
+/**
+ * Stripe payout creation parameters
+ */
+interface StripePayoutCreateParams {
+  amount: number
+  currency: string
+  description?: string
+  destination?: string
+  metadata?: Record<string, string>
+}
+
+/**
+ * Stripe payout options
+ */
+interface StripePayoutOptions {
+  stripeAccount?: string
+}
+
+/**
+ * Stripe payout response
+ */
+interface StripePayoutResponse {
+  id: string
+  amount: number
+  currency: string
+  status: 'paid' | 'pending' | 'in_transit' | 'canceled' | 'failed'
+  arrival_date: number
+  metadata?: Record<string, string>
+}
+
+/**
+ * Stripe balance retrieve options
+ */
+interface StripeBalanceRetrieveOptions {
+  stripeAccount?: string
+}
+
+/**
+ * Stripe balance response
+ */
+interface StripeBalanceResponse {
+  available: Array<{ amount: number; currency: string }>
+  pending: Array<{ amount: number; currency: string }>
+}
+
+/**
+ * Stripe webhook event data
+ */
+interface StripeWebhookEventData {
+  object: {
+    id: string
+    [key: string]: unknown
+  }
+}
+
+/**
+ * Stripe webhook event
+ */
+interface StripeWebhookEvent {
+  type: string
+  data: StripeWebhookEventData
+}
+
+/**
+ * Stripe client interface
+ * Matches the official Stripe SDK structure
  */
 interface StripeClient {
   accounts: {
-    create(params: any): Promise<any>;
-    retrieve(id: string): Promise<any>;
-  };
+    create(params: StripeAccountCreateParams): Promise<StripeAccountResponse>
+    retrieve(id: string): Promise<StripeAccountResponse>
+  }
   accountLinks: {
-    create(params: any): Promise<any>;
-  };
+    create(params: StripeAccountLinkCreateParams): Promise<StripeAccountLinkResponse>
+  }
   paymentIntents: {
-    create(params: any): Promise<any>;
-    retrieve(id: string): Promise<any>;
-  };
+    create(params: StripePaymentIntentCreateParams): Promise<StripePaymentIntentResponse>
+    retrieve(id: string): Promise<StripePaymentIntentResponse>
+  }
   subscriptions: {
-    create(params: any): Promise<any>;
-    update(id: string, params: any): Promise<any>;
-    cancel(id: string): Promise<any>;
-  };
+    create(params: StripeSubscriptionCreateParams): Promise<StripeSubscriptionResponse>
+    update(id: string, params: StripeSubscriptionUpdateParams): Promise<StripeSubscriptionResponse>
+    cancel(id: string): Promise<StripeSubscriptionResponse>
+  }
   payouts: {
-    create(params: any, options?: any): Promise<any>;
-  };
+    create(params: StripePayoutCreateParams, options?: StripePayoutOptions): Promise<StripePayoutResponse>
+  }
   balance: {
-    retrieve(options?: any): Promise<any>;
-  };
+    retrieve(options?: StripeBalanceRetrieveOptions): Promise<StripeBalanceResponse>
+  }
 }
 
 // =============================================================================

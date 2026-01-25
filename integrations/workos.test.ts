@@ -190,7 +190,7 @@ describe('WorkOSIntegration', () => {
       const state = await integration.connect(connectConfig);
 
       expect(state.type).toBe('workos');
-      expect(state.status).toBe('active');
+      expect(state.status).toBe('Active');
       expect(state.organizationId).toBe('org_test123');
     });
 
@@ -248,7 +248,7 @@ describe('WorkOSIntegration', () => {
       const result = await integration.healthCheck();
 
       expect(result.healthy).toBe(false);
-      expect(result.status).toBe('not_configured');
+      expect(result.status).toBe('NotConfigured');
     });
 
     it('should verify organization access', async () => {
@@ -375,6 +375,7 @@ describe('WorkOSIntegration', () => {
 
         expect(users).toHaveLength(1);
         expect(users[0].email).toBe('user@example.com');
+        // Note: WorkOS API returns lowercase 'active', we pass it through unchanged
         expect(users[0].state).toBe('active');
       });
     });

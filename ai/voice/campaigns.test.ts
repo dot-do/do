@@ -100,7 +100,7 @@ describe('VoiceCampaignManager', () => {
 
       expect(campaign.id).toMatch(/^vcamp_/)
       expect(campaign.name).toBe('Test Campaign')
-      expect(campaign.status).toBe('draft')
+      expect(campaign.status).toBe('Draft')
       expect(campaign.contacts).toHaveLength(2)
       expect(campaign.stats?.totalContacts).toBe(2)
     })
@@ -125,7 +125,7 @@ describe('VoiceCampaignManager', () => {
       })
 
       expect(campaign.contacts[0].id).toMatch(/^contact_/)
-      expect(campaign.contacts[0].status).toBe('pending')
+      expect(campaign.contacts[0].status).toBe('Pending')
     })
   })
 
@@ -181,10 +181,10 @@ describe('VoiceCampaignManager', () => {
         settings: { maxAttempts: 3, retryDelay: 60, voicemailDetection: true, callerId: '+15550000000' },
       })
 
-      mockStorage.get.mockImplementation(async () => ({ ...created, status: 'running' }))
+      mockStorage.get.mockImplementation(async () => ({ ...created, status: 'Running' }))
 
       await expect(manager.update(created.id, { name: 'New' }))
-        .rejects.toThrow('Cannot update campaign in status: running')
+        .rejects.toThrow('Cannot update campaign in status: Running')
     })
   })
 
@@ -242,7 +242,7 @@ describe('VoiceCampaignManager', () => {
 
       const started = await manager.start(created.id)
 
-      expect(started.status).toBe('running')
+      expect(started.status).toBe('Running')
       expect(started.startedAt).toBeDefined()
     })
 
@@ -254,10 +254,10 @@ describe('VoiceCampaignManager', () => {
         settings: { maxAttempts: 3, retryDelay: 60, voicemailDetection: true, callerId: '+15550000000' },
       })
 
-      mockStorage.get.mockImplementation(async () => ({ ...created, status: 'completed' }))
+      mockStorage.get.mockImplementation(async () => ({ ...created, status: 'Completed' }))
 
       await expect(manager.start(created.id))
-        .rejects.toThrow('Cannot start campaign in status: completed')
+        .rejects.toThrow('Cannot start campaign in status: Completed')
     })
   })
 
@@ -270,11 +270,11 @@ describe('VoiceCampaignManager', () => {
         settings: { maxAttempts: 3, retryDelay: 60, voicemailDetection: true, callerId: '+15550000000' },
       })
 
-      mockStorage.get.mockImplementation(async () => ({ ...created, status: 'running' }))
+      mockStorage.get.mockImplementation(async () => ({ ...created, status: 'Running' }))
 
       const paused = await manager.pause(created.id)
 
-      expect(paused.status).toBe('paused')
+      expect(paused.status).toBe('Paused')
     })
   })
 
@@ -287,11 +287,11 @@ describe('VoiceCampaignManager', () => {
         settings: { maxAttempts: 3, retryDelay: 60, voicemailDetection: true, callerId: '+15550000000' },
       })
 
-      mockStorage.get.mockImplementation(async () => ({ ...created, status: 'paused' }))
+      mockStorage.get.mockImplementation(async () => ({ ...created, status: 'Paused' }))
 
       const resumed = await manager.resume(created.id)
 
-      expect(resumed.status).toBe('running')
+      expect(resumed.status).toBe('Running')
     })
   })
 
@@ -304,11 +304,11 @@ describe('VoiceCampaignManager', () => {
         settings: { maxAttempts: 3, retryDelay: 60, voicemailDetection: true, callerId: '+15550000000' },
       })
 
-      mockStorage.get.mockImplementation(async () => ({ ...created, status: 'running' }))
+      mockStorage.get.mockImplementation(async () => ({ ...created, status: 'Running' }))
 
       const stopped = await manager.stop(created.id)
 
-      expect(stopped.status).toBe('completed')
+      expect(stopped.status).toBe('Completed')
       expect(stopped.completedAt).toBeDefined()
     })
   })
@@ -338,7 +338,7 @@ describe('VoiceCampaignManager', () => {
         settings: { maxAttempts: 3, retryDelay: 60, voicemailDetection: true, callerId: '+15550000000' },
       })
 
-      mockStorage.get.mockImplementation(async () => ({ ...created, status: 'running' }))
+      mockStorage.get.mockImplementation(async () => ({ ...created, status: 'Running' }))
 
       await expect(manager.delete(created.id))
         .rejects.toThrow('Cannot delete a running campaign')
@@ -412,7 +412,7 @@ describe('VoiceCampaignManager', () => {
         settings: { maxAttempts: 3, retryDelay: 60, voicemailDetection: true, callerId: '+15550000000' },
       })
 
-      mockStorage.get.mockImplementation(async () => ({ ...created, status: 'completed' }))
+      mockStorage.get.mockImplementation(async () => ({ ...created, status: 'Completed' }))
 
       const iterator = manager.watchStats(created.id)
 

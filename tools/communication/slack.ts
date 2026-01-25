@@ -231,8 +231,8 @@ export const blocks = {
    */
   header(text: string): SlackBlock {
     return {
-      type: 'Header',
-      text: { type: 'PlainText', text },
+      type: 'header',
+      text: { type: 'plain_text', text },
     }
   },
 
@@ -251,8 +251,8 @@ export const blocks = {
    */
   section(text: string, accessory?: unknown): SlackBlock {
     const base: SlackBlock = {
-      type: 'Section',
-      text: { type: 'Mrkdwn', text },
+      type: 'section',
+      text: { type: 'mrkdwn', text },
     }
     if (accessory) {
       base.accessory = accessory
@@ -266,7 +266,7 @@ export const blocks = {
    * @returns Divider block
    */
   divider(): SlackBlock {
-    return { type: 'Divider' }
+    return { type: 'divider' }
   },
 
   /**
@@ -284,7 +284,7 @@ export const blocks = {
    */
   context(elements: Array<{ type: 'plain_text' | 'mrkdwn'; text: string } | { type: 'image'; image_url: string; alt_text: string }>): SlackBlock {
     return {
-      type: 'Context',
+      type: 'context',
       elements,
     }
   },
@@ -305,7 +305,7 @@ export const blocks = {
    */
   actions(elements: unknown[]): SlackBlock {
     return {
-      type: 'Actions',
+      type: 'actions',
       elements,
     }
   },

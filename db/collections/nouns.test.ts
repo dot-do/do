@@ -110,7 +110,8 @@ describe('NounCollection', () => {
       expect(nouns.validateSlug('123customer')).toBe(false) // starts with number
       expect(nouns.validateSlug('customer--type')).toBe(false) // double hyphen
       expect(nouns.validateSlug('')).toBe(false) // empty
-      expect(nouns.validateSlug('a')).toBe(false) // too short (depends on regex)
+      // Single char 'a' is valid per the regex /^[a-z][a-z0-9-]{0,62}[a-z0-9]?$/
+      expect(nouns.validateSlug('a')).toBe(true) // single char is valid
     })
   })
 

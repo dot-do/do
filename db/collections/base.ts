@@ -29,6 +29,21 @@ import type {
 } from '../../types/collections'
 
 /**
+ * Base entity interface that all collection entities must extend.
+ *
+ * @description
+ * Defines the common fields that BaseCollection manages automatically:
+ * - id: Unique identifier generated on create
+ * - createdAt: Timestamp when entity was created
+ * - updatedAt: Timestamp when entity was last modified
+ */
+export interface BaseEntity {
+  id: string
+  createdAt?: number
+  updatedAt?: number
+}
+
+/**
  * Storage interface for Durable Object state
  *
  * @description
@@ -142,7 +157,7 @@ export interface CollectionConfig {
  * }
  * ```
  */
-export abstract class BaseCollection<T extends { id: string }>
+export abstract class BaseCollection<T extends BaseEntity>
   implements CollectionMethods<T>
 {
   /**
@@ -328,12 +343,14 @@ export abstract class BaseCollection<T extends { id: string }>
     const id = this.generateId()
     const timestamp = this.now()
 
+    // Type assertion is needed because TypeScript cannot prove that
+    // Omit<T, 'id'> & BaseEntity equals T, even though it does for our use case
     const entity = {
       ...data,
       id,
       createdAt: timestamp,
       updatedAt: timestamp,
-    } as unknown as T
+    } as T
 
     const key = `${this.config.name}:${id}`
     await this.storage.put(key, entity)

@@ -261,7 +261,7 @@ describe('getSnapshotType', () => {
       tables: {},
     }
 
-    expect(getSnapshotType(snapshot)).toBe('full')
+    expect(getSnapshotType(snapshot)).toBe('Full')
   })
 
   it('should return type from metadata', () => {
@@ -272,7 +272,7 @@ describe('getSnapshotType', () => {
       timestamp: Date.now(),
       version: 1,
       tables: {},
-      metadata: { type: 'full', sizeBytes: 100, rowCount: 10 },
+      metadata: { type: 'Full', sizeBytes: 100, rowCount: 10 },
     }
 
     const incrSnapshot: Snapshot = {
@@ -282,10 +282,10 @@ describe('getSnapshotType', () => {
       timestamp: Date.now(),
       version: 2,
       tables: {},
-      metadata: { type: 'incremental', sizeBytes: 50, rowCount: 5, parentId: 'snap_1' },
+      metadata: { type: 'Incremental', sizeBytes: 50, rowCount: 5, parentId: 'snap_1' },
     }
 
-    expect(getSnapshotType(fullSnapshot)).toBe('full')
-    expect(getSnapshotType(incrSnapshot)).toBe('incremental')
+    expect(getSnapshotType(fullSnapshot)).toBe('Full')
+    expect(getSnapshotType(incrSnapshot)).toBe('Incremental')
   })
 })

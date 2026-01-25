@@ -293,7 +293,7 @@ describe('CloudflareIntegration', () => {
       const state = await integration.connect(connectConfig);
 
       expect(state.type).toBe('cloudflare');
-      expect(state.status).toBe('active');
+      expect(state.status).toBe('Active');
       expect(state.accountId).toBe('acct_test123');
     });
 
@@ -376,7 +376,7 @@ describe('CloudflareIntegration', () => {
       const result = await integration.healthCheck();
 
       expect(result.healthy).toBe(false);
-      expect(result.status).toBe('not_configured');
+      expect(result.status).toBe('NotConfigured');
     });
 
     it('should verify token is active', async () => {
@@ -388,7 +388,7 @@ describe('CloudflareIntegration', () => {
       const result = await integration.healthCheck({ detailed: true });
 
       expect(result.healthy).toBe(true);
-      expect(result.status).toBe('active');
+      expect(result.status).toBe('Active');
     });
   });
 
