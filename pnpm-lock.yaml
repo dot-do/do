@@ -51,8 +51,8 @@ importers:
         specifier: ^0.2.0
         version: 0.2.0(hono@4.11.5)(jose@6.1.3)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       rpc.do:
-        specifier: ^0.2.0
-        version: 0.2.0(oauth.do@0.2.0(hono@4.11.5)(jose@6.1.3)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+        specifier: ^0.2.1
+        version: 0.2.1(oauth.do@0.2.0(hono@4.11.5)(jose@6.1.3)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -5136,9 +5136,10 @@ packages:
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
 
-  rpc.do@0.2.0:
-    resolution: {integrity: sha512-6GH8Si0Qe9AmncyZRmlptDDlOAH2jj4BUIysydBgJFKBmY5LCjjQvcUKdV2UmO38g6GeUISo1E4dfOoaHZLc6Q==}
+  rpc.do@0.2.1:
+    resolution: {integrity: sha512-E5aCb16gc1+ySzhJ0TyoDM2KbWuRBo9kbghevWmr8xxP7Y9yIYupE5BS2+PpQCQU2KBaEVUNO68KafICAQ6Iqg==}
     engines: {node: '>=18.0.0'}
+    hasBin: true
     peerDependencies:
       oauth.do: ^0.2.0
     peerDependenciesMeta:
@@ -6564,7 +6565,7 @@ snapshots:
       postgres.do: 0.1.0(@dotdo/pglite@0.1.0)(@dotdo/postgres@0.1.0)(hono@4.11.5)
     optionalDependencies:
       oauth.do: 0.2.0(hono@4.11.5)(jose@6.1.3)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      rpc.do: 0.2.0(oauth.do@0.2.0(hono@4.11.5)(jose@6.1.3)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      rpc.do: 0.2.1(oauth.do@0.2.0(hono@4.11.5)(jose@6.1.3)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
     transitivePeerDependencies:
       - '@cloudflare/workers-types'
       - '@dotdo/pglite'
@@ -12496,9 +12497,9 @@ snapshots:
       '@rollup/rollup-win32-x64-msvc': 4.56.0
       fsevents: 2.3.3
 
-  rpc.do@0.2.0(oauth.do@0.2.0(hono@4.11.5)(jose@6.1.3)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)):
+  rpc.do@0.2.1(oauth.do@0.2.0(hono@4.11.5)(jose@6.1.3)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)):
     optionalDependencies:
-      capnweb: 0.1.0
+      capnweb: 0.4.0
       oauth.do: 0.2.0(hono@4.11.5)(jose@6.1.3)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
 
   run-applescript@7.1.0: {}

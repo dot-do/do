@@ -4,9 +4,21 @@
  * Message serialization, validation, and parsing for the RPC transport.
  * Implements JSON-RPC style messages without requiring schema compilation.
  *
+ * @deprecated This module is deprecated. The `rpc.do` package (via capnweb)
+ * now handles protocol serialization internally. For most use cases, you
+ * should use `sdk/rpc.ts` which wraps rpc.do:
+ *
+ * ```typescript
+ * import { RPC } from '@dotdo/do/sdk/rpc'
+ * const $ = RPC('https://my-do.workers.dev')
+ * ```
+ *
+ * If you still need protocol utilities for server-side handling, this module
+ * remains available but may be removed in a future version.
+ *
  * @module rpc/protocol
  *
- * @example
+ * @example Legacy usage (deprecated):
  * ```typescript
  * import { parseRequest, serializeResponse, validateRequest } from 'do/rpc/protocol'
  *

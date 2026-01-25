@@ -5,9 +5,26 @@
  * Provides type inference for all RPC methods, auto-reconnection, and
  * subscription support.
  *
+ * @deprecated This module is deprecated. Use `sdk/rpc.ts` with `rpc.do` instead:
+ *
+ * ```typescript
+ * // New recommended approach - uses rpc.do package
+ * import { RPC, createDOClient } from '@dotdo/do/sdk/rpc'
+ *
+ * const $ = RPC('https://my-do.workers.dev')
+ * const users = await $.sql`SELECT * FROM users`.all()
+ * const config = await $.storage.get('config')
+ * ```
+ *
+ * The rpc.do package provides:
+ * - Transport-agnostic RPC (http, capnweb/WebSocket, service bindings)
+ * - SQL query support with tagged templates
+ * - Remote storage and collections APIs
+ * - Better type inference and smaller bundle size
+ *
  * @module rpc/client
  *
- * @example
+ * @example Legacy usage (deprecated):
  * ```typescript
  * import { createRPCClient } from 'do/rpc/client'
  *
@@ -138,7 +155,13 @@ class RPCCallError extends Error {
  * Connects to a Digital Object and provides type-safe method calling.
  * Supports both WebSocket (preferred) and HTTP transports.
  *
- * @example
+ * @deprecated Use `RPC()` from `sdk/rpc.ts` instead:
+ * ```typescript
+ * import { RPC } from '@dotdo/do/sdk/rpc'
+ * const $ = RPC('https://my-do.workers.dev')
+ * ```
+ *
+ * @example Legacy usage (deprecated):
  * ```typescript
  * const client = new DOClient('wss://example.com/rpc', {
  *   auth: 'Bearer token',
@@ -928,10 +951,16 @@ export class DOClient implements RPCClient {
  *
  * Creates a client without connecting. Call connect() to establish connection.
  *
+ * @deprecated Use `RPC()` from `sdk/rpc.ts` instead:
+ * ```typescript
+ * import { RPC } from '@dotdo/do/sdk/rpc'
+ * const $ = RPC('https://my-do.workers.dev')
+ * ```
+ *
  * @param options - Client options including URL
  * @returns Client instance
  *
- * @example
+ * @example Legacy usage (deprecated):
  * ```typescript
  * const client = createRPCClient({ url: 'https://my-do.example.com', transport: 'websocket' })
  * await client.connect()
@@ -946,6 +975,12 @@ export function createRPCClient<T = DORPCMethods>(options: RPCClientOptions): DO
  * Create an HTTP-only RPC client
  *
  * For environments where WebSocket is not available.
+ *
+ * @deprecated Use `RPC()` with http transport from `sdk/rpc.ts` instead:
+ * ```typescript
+ * import { RPC, http } from '@dotdo/do/sdk/rpc'
+ * const $ = RPC(http('https://my-do.workers.dev'))
+ * ```
  *
  * @param url - HTTP URL
  * @param options - Client options
