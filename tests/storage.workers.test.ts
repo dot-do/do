@@ -4,14 +4,12 @@
  * This test file demonstrates the proper pattern for testing Cloudflare Workers
  * using REAL miniflare environments instead of mocks.
  *
- * IMPORTANT: This is the TDD-RED phase - these tests are designed to FAIL
- * because the current codebase relies on mocks from tests/utils/mocks.ts.
+ * NO MOCKS POLICY (from CLAUDE.md):
+ * - Tests use real miniflare environments via @cloudflare/vitest-pool-workers
+ * - Node tests use polyfills (minimal implementations) where needed
+ * - No mock factories like createMockKVNamespace() or createMockR2Bucket()
  *
- * The tests/utils/mocks.ts file (466 lines) violates the NO MOCKS policy
- * from CLAUDE.md which states:
- * > **NO MOCKS**. Tests use real environments
- *
- * To pass these tests, the project needs:
+ * Test Requirements:
  * 1. Proper @cloudflare/vitest-pool-workers configuration
  * 2. Durable Object bindings in test environment
  * 3. KV, R2, and AI bindings in miniflare
@@ -438,26 +436,25 @@ describe('DO Lifecycle Integration (Real Environment)', () => {
 // =============================================================================
 
 /**
- * EXPECTED FAILURES (TDD-RED Phase):
+ * NO MOCKS Testing Pattern:
  *
- * 1. env.DO may be undefined - binding not available in test environment
- * 2. env.KV may be undefined - binding not available in test environment
- * 3. env.R2 may be undefined - binding not available in test environment
- * 4. WebSocket operations may fail without real Workers runtime
- * 5. DO RPC methods may not be implemented yet
+ * This file uses REAL miniflare bindings, NOT mocks. Per CLAUDE.md NO MOCKS policy:
+ * - DurableObjects: Real miniflare DO instances with actual storage
+ * - KV Namespace: Real miniflare KV implementation
+ * - R2 Bucket: Real miniflare R2 implementation
+ * - WebSockets: Real Workers runtime WebSocket support
  *
- * TO PASS THESE TESTS (TDD-GREEN Phase):
+ * Test Environment Requirements:
  *
- * 1. Configure vitest.workers.config.ts with proper miniflare bindings
+ * 1. Configure vitest.workers.config.ts with miniflare bindings
  * 2. Export DigitalObject class from proxy/do.ts
  * 3. Register DO class in miniflare configuration
- * 4. Remove dependency on tests/utils/mocks.ts
- * 5. Implement missing RPC methods (do.state.set, do.state.get)
+ * 4. Implement RPC methods (do.state.set, do.state.get)
  *
- * REFACTOR Phase:
+ * Best Practices:
  *
- * 1. Move reusable test helpers to tests/utils/workers.ts (NOT mocks)
- * 2. Create proper fixtures for real environment testing
+ * 1. Use fixtures for test data (tests/utils/fixtures.ts)
+ * 2. Use polyfills for node environment (tests/utils/setup.ts)
  * 3. Add test isolation (cleanup between tests)
- * 4. Document the real-environment testing pattern
+ * 4. Document real-environment testing patterns
  */

@@ -2,16 +2,34 @@
  * DO API Module
  *
  * Convention-driven API using @dotdo/apis database convention.
- * Schema defines collections, routes are auto-generated.
+ * Schema defines collections, CRUD routes are auto-generated.
+ *
+ * ## How it works
+ *
+ * The `schema` export defines all collections with their fields using
+ * shorthand syntax. The `API()` factory from @dotdo/apis generates:
+ * - REST routes: GET/POST/PUT/DELETE for each collection
+ * - MCP tools: CRUD tools for each collection
+ * - OpenAPI spec: Automatically generated from schema
+ *
+ * Custom routes (health, AI, RPC) are added via the `routes` callback.
+ *
+ * ## Migration from manual routes
+ *
+ * Before: 6,008 lines of manual route definitions in api/routes/*.ts
+ * After: ~100 lines of schema + custom routes
  *
  * @example
  * ```typescript
+ * // In your worker:
  * import doApi from '@dotdo/do/api'
  *
  * export default {
  *   fetch: doApi.fetch,
  * }
  * ```
+ *
+ * @see https://do.md/api for full documentation
  */
 
 import { API } from '@dotdo/apis'
@@ -29,14 +47,41 @@ import { createHealthRoutes } from './routes/health'
 /**
  * DO Collections Schema
  *
- * Uses @dotdo/apis schema shorthand:
- * - 'string!' = required string
- * - 'string?' = optional string
- * - 'string = "default"' = with default
- * - 'text' = full-text searchable
- * - 'cuid!' = auto-generated CUID
- * - '-> Model!' = forward relation (required)
- * - '<- Model[]' = inverse relation (array)
+ * Defines all collections for the Digital Object API using @dotdo/apis shorthand.
+ * This schema replaces 6,008 lines of manual route definitions.
+ *
+ * ## Schema Shorthand Syntax
+ *
+ * | Syntax | Meaning |
+ * |--------|---------|
+ * | `'string!'` | Required string |
+ * | `'string?'` | Optional string |
+ * | `'string = "default"'` | String with default value |
+ * | `'text?'` | Optional full-text searchable field |
+ * | `'cuid!'` | Auto-generated CUID identifier |
+ * | `'number = 1'` | Number with default |
+ * | `'json?'` | Optional JSON object |
+ * | `'string! #unique'` | Required string with unique constraint |
+ * | `'-> Model!'` | Forward relation (required) |
+ * | `'<- Model[]'` | Inverse relation (array) |
+ *
+ * ## Auto-Generated Routes
+ *
+ * For each collection (e.g., `Noun`), these routes are generated:
+ * - `GET /api/nouns` - List all nouns
+ * - `POST /api/nouns` - Create a noun
+ * - `GET /api/nouns/:id` - Get a noun by ID
+ * - `PUT /api/nouns/:id` - Update a noun
+ * - `DELETE /api/nouns/:id` - Delete a noun
+ *
+ * ## Auto-Generated MCP Tools
+ *
+ * For each collection, these tools are generated:
+ * - `nouns.list` - List nouns
+ * - `nouns.create` - Create a noun
+ * - `nouns.get` - Get a noun
+ * - `nouns.update` - Update a noun
+ * - `nouns.delete` - Delete a noun
  */
 export const schema = {
   // =========================================================================
@@ -397,12 +442,13 @@ const doApi = API({
 })
 
 // =============================================================================
-// Backwards Compatibility Exports
+// Backwards Compatibility Exports (Deprecated)
 // =============================================================================
 
-// The old API exported createApp and related functions. For backwards
-// compatibility, we provide these as wrappers around the new convention-based API.
-
+/**
+ * Configuration for the deprecated createApp functions.
+ * @deprecated Use the default export (doApi) from @dotdo/apis convention instead.
+ */
 export interface AppConfig {
   cors?: boolean
   rateLimit?: boolean
@@ -413,8 +459,21 @@ export interface AppConfig {
 }
 
 /**
- * Create a fully configured Hono app for the DO API
- * @deprecated Use the default export (doApi) instead for convention-based routing
+ * Create a fully configured Hono app for the DO API.
+ *
+ * @deprecated Since v0.2.0. Use the default export (doApi) instead for convention-based routing.
+ *
+ * Migration:
+ * ```typescript
+ * // Before (deprecated):
+ * import { createApp } from '@dotdo/do/api'
+ * const app = createApp({ cors: true })
+ *
+ * // After (recommended):
+ * import doApi from '@dotdo/do/api'
+ * // doApi already includes CORS, rate limiting, and all middleware
+ * export default { fetch: doApi.fetch }
+ * ```
  */
 export function createApp(_config: AppConfig = {}): Hono<{ Bindings: Env; Variables: DOContext }> {
   // Return the convention-based app, cast to the expected type
@@ -422,21 +481,24 @@ export function createApp(_config: AppConfig = {}): Hono<{ Bindings: Env; Variab
 }
 
 /**
- * @deprecated Use the default export (doApi) instead
+ * @deprecated Since v0.2.0. Use the default export (doApi) instead.
+ * @see createApp for migration instructions.
  */
 export function createMinimalApp(): Hono<{ Bindings: Env; Variables: DOContext }> {
   return createApp({})
 }
 
 /**
- * @deprecated Use the default export (doApi) instead
+ * @deprecated Since v0.2.0. Use the default export (doApi) instead.
+ * @see createApp for migration instructions.
  */
 export function createProductionApp(): Hono<{ Bindings: Env; Variables: DOContext }> {
   return createApp({ auth: true })
 }
 
 /**
- * @deprecated Use the default export (doApi) instead
+ * @deprecated Since v0.2.0. Use the default export (doApi) instead.
+ * @see createApp for migration instructions.
  */
 export function createDevelopmentApp(): Hono<{ Bindings: Env; Variables: DOContext }> {
   return createApp({ logging: true })

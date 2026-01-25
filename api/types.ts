@@ -29,8 +29,6 @@ export interface Env {
   AI: Ai
   /** Environment (development, staging, production) */
   ENVIRONMENT: string
-  /** Optional: Auth secret for JWT validation */
-  AUTH_SECRET?: string
   /** Optional: Rate limit requests per minute */
   RATE_LIMIT_RPM?: string
 }
@@ -87,10 +85,11 @@ export interface AuthResult {
 
 /**
  * Authentication options
+ *
+ * Note: JWT validation uses oauth.do with JWKS verification.
+ * See api/middleware/auth.ts for the oauth.do integration.
  */
 export interface AuthOptions {
-  /** JWT secret for validation */
-  secret?: string
   /** Whether to require auth (vs optional) */
   required?: boolean
   /** Required roles */

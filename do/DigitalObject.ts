@@ -32,17 +32,16 @@
 
 import type { DurableObjectState, DurableObjectId, DurableObject } from '@cloudflare/workers-types'
 import type { DigitalObjectIdentity, DOType, DigitalObjectRef } from '../types/identity'
-import type { CDCEvent, CDCCursor, CDCOptions, CDCOperation } from '../types/storage'
+import type { CDCEvent, CDCOptions, CDCOperation } from '../types/storage'
 import type { RPCRequest, RPCResponse } from '../types/rpc'
-import { createDOState, type DOState, type MutationHandler } from './state'
+import { createDOState, type DOState } from './state'
 import { HibernationManager, type HibernationConfig } from './hibernation'
-import { ContextStreamer, type StreamerOptions } from '../db/cdc/streaming'
+import { ContextStreamer } from '../db/cdc/streaming'
 import {
   MethodRegistry,
   dispatch,
   registerSystemMethods,
   registerIdentityMethods,
-  type MethodContext,
   type DOMethodContext,
 } from '../rpc/methods'
 
