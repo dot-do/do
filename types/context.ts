@@ -6,6 +6,29 @@
  *
  * Examples:
  * ```typescript
+ * // Complete DO with RPC API
+ * export default DO(async ($) => {
+ *   // Register event handlers
+ *   $.on.Customer.created(async (customer) => {
+ *     await $.email`welcome ${customer.name} to ${customer.email}`
+ *   })
+ *
+ *   // Register scheduled tasks
+ *   $.every.Monday.at9am(async () => {
+ *     const report = await $.ai`generate weekly report`
+ *     await $.slack`#metrics ${report}`
+ *   })
+ *
+ *   // Return RPC API methods
+ *   return {
+ *     ping: async () => 'pong',
+ *     users: {
+ *       get: async (id: string) => $.db.User.get(id),
+ *       list: async () => $.db.User.list(),
+ *     }
+ *   }
+ * })
+ *
  * // AI operations
  * const ideas = await $.ai`5 startup ideas for ${industry}`
  * const summary = await $.ai`summarize ${document}`
@@ -13,16 +36,6 @@
  * // Database with natural language
  * const stuck = await $.db.Order`what's stuck in processing?`
  * const users = await $.db.User.list()
- *
- * // Events and schedules
- * $.on.Customer.created(async (customer) => {
- *   await $.email`welcome ${customer.name} to ${customer.email}`
- * })
- *
- * $.every.Monday.at9am(async () => {
- *   const report = await $.ai`generate weekly report`
- *   await $.slack`#metrics ${report}`
- * })
  *
  * // Telephony
  * await $.sms`remind ${contact.phone} about ${appointment}`
@@ -351,7 +364,8 @@ export interface DOCascadeContext {
  *
  * Usage:
  * ```typescript
- * DO($ => {
+ * // With RPC API
+ * DO(async ($) => {
  *   // AI
  *   const ideas = await $.ai`5 startup ideas`
  *   const viable = await $.ai.is`${ideas[0]} is technically feasible`
@@ -369,6 +383,19 @@ export interface DOCascadeContext {
  *   $.every.Monday.at9am(async () => {
  *     await $.slack`#team Weekly standup time!`
  *   })
+ *
+ *   // Return RPC API
+ *   return {
+ *     ideas: {
+ *       generate: async (count: number) => $.ai`${count} startup ideas`,
+ *     }
+ *   }
+ * })
+ *
+ * // Without RPC API (events/schedules only)
+ * DO(async ($) => {
+ *   $.on.Order.placed(...)
+ *   $.every.hour(...)
  * })
  * ```
  */
@@ -432,20 +459,39 @@ export interface DOContext {
 // =============================================================================
 
 /**
+ * RPC API type - methods and namespaces that get exposed via RPC
+ */
+export type RPCAPI = Record<string, ((...args: any[]) => any) | Record<string, (...args: any[]) => any>>
+
+/**
  * Create a Digital Object with $ context
  *
- * ```typescript
- * export default DO($ => {
- *   $.on.Order.placed(async (order) => {
- *     await $.ai`process ${order}`
- *   })
+ * The factory can optionally return an RPC API object that defines
+ * the methods exposed via RPC. If no return value, only events/schedules are configured.
  *
- *   $.every.hour(async () => {
- *     await $.db.Cache.refresh()
- *   })
+ * @example
+ * ```typescript
+ * // With RPC API
+ * export default DO(async ($) => {
+ *   $.on.User.created(...)
+ *
+ *   return {
+ *     ping: async () => 'pong',
+ *     users: {
+ *       get: async (id: string) => {...},
+ *     }
+ *   }
+ * })
+ *
+ * // Without RPC API (events/schedules only)
+ * export default DO(async ($) => {
+ *   $.on.Order.placed(...)
+ *   $.every.hour(...)
  * })
  * ```
  */
-export type DOFactory = (setup: ($: DOContext) => void | Promise<void>) => {
+export type DOFactory = <API extends RPCAPI | void = void>(
+  setup: ($: DOContext) => API | Promise<API>
+) => {
   fetch: (request: Request) => Promise<Response>
 }
