@@ -170,12 +170,39 @@ export class NounCollection extends BaseCollection<Noun> {
    * ```
    */
   async create(data: Omit<Noun, 'id'>): Promise<Noun> {
-    // TODO: Implement with:
-    // 1. Validate slug format (lowercase, alphanumeric, hyphens)
+    // 1. Validate slug format
+    if (!this.validateSlug(data.slug)) {
+      throw new ValidationError(`Invalid slug format: '${data.slug}'. Slugs must be lowercase alphanumeric with hyphens, start with a letter, and not contain double hyphens.`, 'slug')
+    }
+
     // 2. Check slug uniqueness
-    // 3. Generate ID
-    // 4. Store in SQLite
-    throw new Error('Not implemented')
+    const existing = await this.getBySlug(data.slug)
+    if (existing) {
+      throw new ValidationError(`Slug '${data.slug}' already exists`, 'slug')
+    }
+
+    // 3. Generate ID and timestamps
+    const id = this.generateId()
+    const timestamp = this.now()
+
+    // 4. Create noun entity
+    const noun: Noun = {
+      id,
+      name: data.name,
+      singular: data.singular,
+      plural: data.plural,
+      slug: data.slug,
+      schema: data.schema,
+      description: data.description,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }
+
+    // 5. Store in KV
+    const key = `${this.config.name}:${id}`
+    await this.storage.put(key, noun)
+
+    return noun
   }
 
   /**
@@ -193,8 +220,15 @@ export class NounCollection extends BaseCollection<Noun> {
    * ```
    */
   async getBySlug(slug: string): Promise<Noun | null> {
-    // TODO: Query by slug
-    throw new Error('Not implemented')
+    const prefix = `${this.config.name}:`
+    const allItems = await this.storage.list<Noun>({ prefix })
+
+    for (const noun of allItems.values()) {
+      if (noun.slug === slug) {
+        return noun
+      }
+    }
+    return null
   }
 
   /**
@@ -209,8 +243,16 @@ export class NounCollection extends BaseCollection<Noun> {
    * ```
    */
   async getByName(name: string): Promise<Noun | null> {
-    // TODO: Query by name with case-insensitive comparison
-    throw new Error('Not implemented')
+    const prefix = `${this.config.name}:`
+    const allItems = await this.storage.list<Noun>({ prefix })
+    const lowerName = name.toLowerCase()
+
+    for (const noun of allItems.values()) {
+      if (noun.name.toLowerCase() === lowerName) {
+        return noun
+      }
+    }
+    return null
   }
 
   /**
@@ -227,8 +269,8 @@ export class NounCollection extends BaseCollection<Noun> {
    * ```
    */
   async isSlugAvailable(slug: string): Promise<boolean> {
-    // TODO: Check for existing noun with slug
-    throw new Error('Not implemented')
+    const existing = await this.getBySlug(slug)
+    return existing === null
   }
 
   /**
@@ -250,8 +292,21 @@ export class NounCollection extends BaseCollection<Noun> {
    * ```
    */
   async updateSchema(id: string, schema: Record<string, unknown>): Promise<Noun> {
-    // TODO: Update only the schema field
-    throw new Error('Not implemented')
+    const existing = await this.get(id)
+    if (!existing) {
+      throw new NotFoundError(this.config.name, id)
+    }
+
+    const updated: Noun = {
+      ...existing,
+      schema,
+      updatedAt: this.now(),
+    }
+
+    const key = `${this.config.name}:${id}`
+    await this.storage.put(key, updated)
+
+    return updated
   }
 
   /**
@@ -299,8 +354,30 @@ export class NounCollection extends BaseCollection<Noun> {
    * ```
    */
   async getWithRelations(): Promise<Noun[]> {
-    // TODO: Filter nouns where schema contains ->, ~>, <-, or <~
-    throw new Error('Not implemented')
+    const prefix = `${this.config.name}:`
+    const allItems = await this.storage.list<Noun>({ prefix })
+    const results: Noun[] = []
+
+    // Cascade operators to look for
+    const cascadeOperators = ['->', '~>', '<-', '<~']
+
+    for (const noun of allItems.values()) {
+      if (!noun.schema) continue
+
+      // Check if any schema value contains a cascade operator
+      const hasRelation = Object.values(noun.schema).some((value) => {
+        if (typeof value === 'string') {
+          return cascadeOperators.some((op) => value.includes(op))
+        }
+        return false
+      })
+
+      if (hasRelation) {
+        results.push(noun)
+      }
+    }
+
+    return results
   }
 
   /**
@@ -315,8 +392,15 @@ export class NounCollection extends BaseCollection<Noun> {
    * ```
    */
   async exportRegistry(): Promise<Record<string, Record<string, unknown>>> {
-    // TODO: Build slug -> schema map
-    throw new Error('Not implemented')
+    const prefix = `${this.config.name}:`
+    const allItems = await this.storage.list<Noun>({ prefix })
+    const registry: Record<string, Record<string, unknown>> = {}
+
+    for (const noun of allItems.values()) {
+      registry[noun.slug] = noun.schema ?? {}
+    }
+
+    return registry
   }
 }
 

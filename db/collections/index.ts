@@ -170,3 +170,21 @@ export {
   parseRelationField,
   isRelationField,
 } from '../../types/cascade'
+
+// Introspection
+export {
+  Introspection,
+  getSchema,
+  getVerbs,
+  getStats,
+  getRelationshipTypes,
+} from './introspection'
+
+export type {
+  IntrospectionResult,
+  NounSchema,
+  VerbForms,
+  CollectionStats,
+  CascadeAnnotation,
+  CascadeOperatorDef,
+} from './introspection'

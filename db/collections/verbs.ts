@@ -290,12 +290,33 @@ export class VerbCollection extends BaseCollection<Verb> {
    * ```
    */
   async create(data: Omit<Verb, 'id'>): Promise<Verb> {
-    // TODO: Implement with:
     // 1. Validate action format (lowercase, alphabetic)
+    if (!this.validateAction(data.action)) {
+      throw new ValidationError(`Invalid action format: ${data.action}. Must be 2-32 lowercase alphabetic characters.`, 'action')
+    }
+
     // 2. Check action uniqueness
-    // 3. Generate ID
-    // 4. Store in SQLite
-    throw new Error('Not implemented')
+    const existing = await this.getByAction(data.action)
+    if (existing) {
+      throw new ValidationError(`Verb with action '${data.action}' already exists`, 'action')
+    }
+
+    // 3. Generate ID and timestamps
+    const id = this.generateId()
+    const timestamp = this.now()
+
+    const verb: Verb = {
+      ...data,
+      id,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }
+
+    // 4. Store in storage
+    const key = `${this.config.name}:${id}`
+    await this.storage.put(key, verb)
+
+    return verb
   }
 
   /**
@@ -310,8 +331,16 @@ export class VerbCollection extends BaseCollection<Verb> {
    * ```
    */
   async getByAction(action: string): Promise<Verb | null> {
-    // TODO: Query by action field
-    throw new Error('Not implemented')
+    const prefix = `${this.config.name}:`
+    const allItems = await this.storage.list<Verb>({ prefix })
+
+    for (const verb of allItems.values()) {
+      if (verb.action === action) {
+        return verb
+      }
+    }
+
+    return null
   }
 
   /**
@@ -327,8 +356,16 @@ export class VerbCollection extends BaseCollection<Verb> {
    * ```
    */
   async getByEvent(event: string): Promise<Verb | null> {
-    // TODO: Query by event field
-    throw new Error('Not implemented')
+    const prefix = `${this.config.name}:`
+    const allItems = await this.storage.list<Verb>({ prefix })
+
+    for (const verb of allItems.values()) {
+      if (verb.event === event) {
+        return verb
+      }
+    }
+
+    return null
   }
 
   /**
@@ -344,8 +381,16 @@ export class VerbCollection extends BaseCollection<Verb> {
    * ```
    */
   async getByAnyForm(form: string): Promise<Verb | null> {
-    // TODO: Query by any form field
-    throw new Error('Not implemented')
+    const prefix = `${this.config.name}:`
+    const allItems = await this.storage.list<Verb>({ prefix })
+
+    for (const verb of allItems.values()) {
+      if (verb.action === form || verb.act === form || verb.activity === form || verb.event === form || verb.reverse === form) {
+        return verb
+      }
+    }
+
+    return null
   }
 
   /**
@@ -467,7 +512,8 @@ export class VerbCollection extends BaseCollection<Verb> {
    * ```
    */
   validateAction(action: string): boolean {
-    const actionRegex = /^[a-z]{2,32}$/
+    // Allow lowercase letters and camelCase (for relationship verbs like memberOf, belongsTo)
+    const actionRegex = /^[a-z][a-zA-Z]{1,31}$/
     return actionRegex.test(action)
   }
 
