@@ -68,6 +68,18 @@ export type {
   DurableObjectId,
   DurableObjectStub,
   Fetcher,
+  // Service interfaces (chainable RPC)
+  MDXService,
+  MDXCompileOptions,
+  MDXEvaluateOptions,
+  MDXRenderOptions,
+  AuthService,
+  OAuthService,
+  GitHubService,
+  ESBuildService,
+  ESBuildBuildOptions,
+  ESBuildTransformOptions,
+  MCPService,
 } from './types'
 
 // =============================================================================

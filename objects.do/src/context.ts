@@ -18,6 +18,13 @@ import type {
   StripeContext,
   TaggedTemplate,
   Env,
+  Fetcher,
+  MDXService,
+  AuthService,
+  OAuthService,
+  GitHubService,
+  ESBuildService,
+  MCPService,
 } from './types'
 
 // =============================================================================
@@ -136,6 +143,14 @@ export function createContext(
   const log = createLogContext(definition.$id)
   const stripe = createStripeContext(env)
 
+  // Create service proxies (chainable RPC)
+  const mdx = createServiceProxy<MDXService>(env.MDX)
+  const auth = createServiceProxy<AuthService>(env.AUTH)
+  const oauth = createServiceProxy<OAuthService>(env.OAUTH)
+  const github = createServiceProxy<GitHubService>(env.GITHUB)
+  const esbuild = createServiceProxy<ESBuildService>(env.ESBUILD)
+  const mcp = createServiceProxy<MCPService>(env.MCP)
+
   return {
     // Identity
     $id: definition.$id,
@@ -184,9 +199,81 @@ export function createContext(
     // Logging
     log,
 
-    // Stripe
+    // Stripe (legacy - uses service proxy internally)
     stripe,
+
+    // Service proxies (chainable RPC)
+    mdx,
+    auth,
+    oauth,
+    github,
+    esbuild,
+    mcp,
   }
+}
+
+// =============================================================================
+// Service Proxy Factory (Chainable RPC)
+// =============================================================================
+
+/**
+ * Create a chainable service proxy for RPC calls
+ *
+ * Allows ergonomic calls like:
+ *   $.mdx.compile(source)
+ *   $.github.repos.list()
+ *   $.github.pulls.create({ owner, repo, title })
+ *
+ * The proxy records the method path and makes RPC call when invoked.
+ *
+ * @param fetcher - Service binding fetcher
+ * @returns Chainable proxy that types as T
+ */
+function createServiceProxy<T>(fetcher: Fetcher | undefined): T {
+  const createProxy = (path: string[] = []): unknown => {
+    // The proxy function that gets called
+    const callFn = async (...args: unknown[]): Promise<unknown> => {
+      if (!fetcher) {
+        throw new Error(`Service not available: ${path.join('.')}`)
+      }
+
+      const method = path.join('.')
+      const response = await fetcher.fetch(new Request('http://internal/rpc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ method, params: args }),
+      }))
+
+      const data = await response.json() as { result?: unknown; error?: { message: string } }
+      if (data.error) {
+        throw new Error(data.error.message)
+      }
+      return data.result
+    }
+
+    // Make the proxy thenable for direct await
+    const thenable = {
+      then: (resolve: (value: unknown) => void, reject: (error: unknown) => void) => {
+        return callFn().then(resolve, reject)
+      },
+    }
+
+    return new Proxy(callFn, {
+      get(_target, prop: string) {
+        // Handle Promise interface for await
+        if (prop === 'then') {
+          return thenable.then
+        }
+        // Chain property access
+        return createProxy([...path, prop])
+      },
+      apply(_target, _thisArg, args) {
+        return callFn(...args)
+      },
+    })
+  }
+
+  return createProxy() as T
 }
 
 // =============================================================================

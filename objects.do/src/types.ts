@@ -587,6 +587,77 @@ export interface DOContext {
    * Stripe operations (via stripe.do service)
    */
   stripe: StripeContext
+
+  // -------------------------------------------------------------------------
+  // Service Bindings (via RPC)
+  // -------------------------------------------------------------------------
+
+  /**
+   * MDX compilation & rendering (via mdx.do service)
+   *
+   * @example
+   * ```typescript
+   * const compiled = await $.mdx.compile('# Hello {name}')
+   * const html = await $.mdx.render(source, { props: { name: 'World' } })
+   * const valid = await $.mdx.lint(source)
+   * ```
+   */
+  mdx: MDXService
+
+  /**
+   * Auth operations (via auth.do service)
+   *
+   * @example
+   * ```typescript
+   * const session = await $.auth.verify(token)
+   * const user = await $.auth.getUser(userId)
+   * ```
+   */
+  auth: AuthService
+
+  /**
+   * OAuth operations (via oauth.do service)
+   *
+   * @example
+   * ```typescript
+   * const url = await $.oauth.authorize('github', { scopes: ['repo'] })
+   * const tokens = await $.oauth.callback('github', code)
+   * ```
+   */
+  oauth: OAuthService
+
+  /**
+   * GitHub operations (via github.do service)
+   *
+   * @example
+   * ```typescript
+   * const repos = await $.github.repos.list()
+   * const pr = await $.github.pulls.create({ owner, repo, title, body })
+   * ```
+   */
+  github: GitHubService
+
+  /**
+   * ESBuild operations (via esbuild.do service)
+   *
+   * @example
+   * ```typescript
+   * const result = await $.esbuild.build({ entryPoints: ['app.ts'] })
+   * const transformed = await $.esbuild.transform(code, { loader: 'ts' })
+   * ```
+   */
+  esbuild: ESBuildService
+
+  /**
+   * MCP operations (via mcp.do service)
+   *
+   * @example
+   * ```typescript
+   * const tools = await $.mcp.tools.list()
+   * const result = await $.mcp.tools.call('search', { query: '...' })
+   * ```
+   */
+  mcp: MCPService
 }
 
 // =============================================================================
@@ -867,6 +938,149 @@ export interface StripePaymentIntent {
 }
 
 // =============================================================================
+// Service Interfaces (RPC to external workers)
+// =============================================================================
+
+/**
+ * MDX service interface (mdx.do)
+ */
+export interface MDXService {
+  /** Compile MDX to JavaScript */
+  compile(source: string, options?: MDXCompileOptions): Promise<{ code: string; matter?: Record<string, unknown> }>
+
+  /** Evaluate MDX and return exports */
+  evaluate(source: string, options?: MDXEvaluateOptions): Promise<{ exports: string[] }>
+
+  /** Render MDX to HTML (server-side) */
+  render(source: string, options?: MDXRenderOptions): Promise<{ code: string; props?: Record<string, unknown> }>
+
+  /** Parse frontmatter from MDX */
+  frontmatter(source: string): Promise<Record<string, string>>
+
+  /** Lint MDX source for errors */
+  lint(source: string): Promise<{ valid: boolean; errors: Array<{ message: string; line?: number; column?: number }> }>
+}
+
+export interface MDXCompileOptions {
+  jsx?: boolean
+  format?: 'mdx' | 'md'
+  development?: boolean
+}
+
+export interface MDXEvaluateOptions extends MDXCompileOptions {
+  props?: Record<string, unknown>
+}
+
+export interface MDXRenderOptions {
+  props?: Record<string, unknown>
+  components?: Record<string, string>
+}
+
+/**
+ * Auth service interface (auth.do)
+ */
+export interface AuthService {
+  /** Verify a session token */
+  verify(token: string): Promise<{ valid: boolean; userId?: string; sessionId?: string }>
+
+  /** Get user by ID */
+  getUser(id: string): Promise<{ id: string; email?: string; name?: string } | null>
+
+  /** Create a new session */
+  createSession(userId: string): Promise<{ token: string; expiresAt: number }>
+
+  /** Revoke a session */
+  revokeSession(token: string): Promise<{ success: boolean }>
+}
+
+/**
+ * OAuth service interface (oauth.do)
+ */
+export interface OAuthService {
+  /** Get authorization URL for a provider */
+  authorize(provider: string, options?: { scopes?: string[]; state?: string }): Promise<{ url: string }>
+
+  /** Handle OAuth callback */
+  callback(provider: string, code: string): Promise<{ accessToken: string; refreshToken?: string; expiresAt?: number }>
+
+  /** Refresh tokens */
+  refresh(provider: string, refreshToken: string): Promise<{ accessToken: string; expiresAt?: number }>
+
+  /** Get provider tokens for a user */
+  getTokens(provider: string, userId: string): Promise<{ accessToken: string; expiresAt?: number } | null>
+}
+
+/**
+ * GitHub service interface (github.do)
+ */
+export interface GitHubService {
+  repos: {
+    list(): Promise<Array<{ id: number; name: string; fullName: string }>>
+    get(owner: string, repo: string): Promise<{ id: number; name: string; fullName: string; defaultBranch: string }>
+    create(data: { name: string; private?: boolean; description?: string }): Promise<{ id: number; name: string }>
+  }
+  pulls: {
+    list(owner: string, repo: string): Promise<Array<{ id: number; number: number; title: string; state: string }>>
+    get(owner: string, repo: string, number: number): Promise<{ id: number; number: number; title: string; body: string }>
+    create(data: { owner: string; repo: string; title: string; body: string; head: string; base: string }): Promise<{ id: number; number: number; url: string }>
+  }
+  issues: {
+    list(owner: string, repo: string): Promise<Array<{ id: number; number: number; title: string; state: string }>>
+    create(data: { owner: string; repo: string; title: string; body?: string }): Promise<{ id: number; number: number; url: string }>
+  }
+}
+
+/**
+ * ESBuild service interface (esbuild.do)
+ */
+export interface ESBuildService {
+  /** Build a bundle */
+  build(options: ESBuildBuildOptions): Promise<{ outputFiles: Array<{ path: string; contents: string }> }>
+
+  /** Transform code */
+  transform(code: string, options?: ESBuildTransformOptions): Promise<{ code: string; map?: string }>
+
+  /** Analyze a bundle */
+  analyze(options: ESBuildBuildOptions): Promise<{ metafile: Record<string, unknown> }>
+}
+
+export interface ESBuildBuildOptions {
+  entryPoints?: string[]
+  stdin?: { contents: string; loader?: string }
+  bundle?: boolean
+  minify?: boolean
+  format?: 'esm' | 'cjs' | 'iife'
+  target?: string
+  platform?: 'browser' | 'node' | 'neutral'
+}
+
+export interface ESBuildTransformOptions {
+  loader?: 'ts' | 'tsx' | 'js' | 'jsx' | 'json' | 'css'
+  minify?: boolean
+  target?: string
+}
+
+/**
+ * MCP service interface (mcp.do)
+ */
+export interface MCPService {
+  tools: {
+    /** List available tools */
+    list(): Promise<Array<{ name: string; description: string; inputSchema: Record<string, unknown> }>>
+
+    /** Call a tool */
+    call(name: string, args: Record<string, unknown>): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }>
+  }
+  resources: {
+    /** List available resources */
+    list(): Promise<Array<{ uri: string; name: string; mimeType?: string }>>
+
+    /** Read a resource */
+    read(uri: string): Promise<{ contents: Array<{ uri: string; text: string; mimeType?: string }> }>
+  }
+}
+
+// =============================================================================
 // Execution Result Types
 // =============================================================================
 
@@ -1046,6 +1260,21 @@ export interface Env {
 
   /** ai.do service */
   AI: Fetcher
+
+  /** mdx.do service */
+  MDX: Fetcher
+
+  /** auth.do service */
+  AUTH: Fetcher
+
+  /** oauth.do service */
+  OAUTH: Fetcher
+
+  /** github.do service */
+  GITHUB: Fetcher
+
+  /** mcp.do service */
+  MCP: Fetcher
 }
 
 /**
