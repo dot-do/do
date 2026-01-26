@@ -5,7 +5,7 @@
  * No deployment needed - the DO is immediately live as data.
  */
 
-import { extractTypes, type ExtractedSchema } from 'rpc.do'
+import { extractTypes, type ExtractedSchema } from 'rpc.do/extract'
 import { readFileSync } from 'node:fs'
 
 export interface PublishOptions {
@@ -131,7 +131,7 @@ function schemaToDefinition(schema: ExtractedSchema, id: string): DODefinition {
   for (const method of schema.methods) {
     // Store the method signature info
     api[method.name] = {
-      params: method.params.map(p => p.name),
+      params: method.parameters.map((p) => p.name),
       returns: method.returnType,
     }
   }
@@ -140,7 +140,7 @@ function schemaToDefinition(schema: ExtractedSchema, id: string): DODefinition {
     const nsApi: Record<string, unknown> = {}
     for (const method of ns.methods) {
       nsApi[method.name] = {
-        params: method.params.map(p => p.name),
+        params: method.parameters.map((p) => p.name),
         returns: method.returnType,
       }
     }

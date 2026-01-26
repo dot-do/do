@@ -18,9 +18,39 @@
 import { Command } from 'commander'
 import { publish, type PublishOptions } from './publish.js'
 import { dev } from './dev.js'
-import { extractTypes, generateDTS, generateIndex } from 'rpc.do'
+import { extractTypes, generateDTS, generateIndex } from 'rpc.do/extract'
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { resolve, join, basename } from 'node:path'
+
+interface PublishCommandOptions {
+  id?: string
+  domain?: string
+  registry?: string
+  token?: string
+  dryRun?: boolean
+}
+
+interface DevCommandOptions {
+  port: string
+  id?: string
+}
+
+interface TypesCommandOptions {
+  output: string
+}
+
+interface LoginCommandOptions {
+  token?: string
+}
+
+interface ListCommandOptions {
+  registry: string
+}
+
+interface DeleteCommandOptions {
+  registry: string
+  force?: boolean
+}
 
 const program = new Command()
 
@@ -41,7 +71,7 @@ program
   .option('--registry <url>', 'Registry URL (default: https://objects.do)')
   .option('--token <token>', 'Auth token (or set DOTDO_TOKEN)')
   .option('--dry-run', 'Show what would be published without publishing')
-  .action(async (source: string, options) => {
+  .action(async (source: string, options: PublishCommandOptions) => {
     const sourceFile = resolve(process.cwd(), source)
 
     if (!existsSync(sourceFile)) {
@@ -85,8 +115,8 @@ program
       console.log(`  POST ${result.url}/rpc`)
       console.log(`\nSchema:`)
       console.log(`  GET ${result.url}/__schema`)
-    } catch (err: any) {
-      console.error(`Error: ${err.message}`)
+    } catch (err: unknown) {
+      console.error(`Error: ${err instanceof Error ? err.message : String(err)}`)
       process.exit(1)
     }
   })
@@ -100,7 +130,7 @@ program
   .description('Run a DO locally for development')
   .option('--port <port>', 'Port to run on', '8787')
   .option('--id <id>', 'DO ID for local development')
-  .action(async (source: string, options) => {
+  .action(async (source: string, options: DevCommandOptions) => {
     const sourceFile = resolve(process.cwd(), source)
 
     if (!existsSync(sourceFile)) {
@@ -116,8 +146,8 @@ program
         port: parseInt(options.port, 10),
         id: options.id,
       })
-    } catch (err: any) {
-      console.error(`Error: ${err.message}`)
+    } catch (err: unknown) {
+      console.error(`Error: ${err instanceof Error ? err.message : String(err)}`)
       process.exit(1)
     }
   })
@@ -130,7 +160,7 @@ program
   .command('types <source>')
   .description('Generate TypeScript types for a DO')
   .option('--output <dir>', 'Output directory', '.do')
-  .action(async (source: string, options) => {
+  .action(async (source: string, options: TypesCommandOptions) => {
     const sourceFile = resolve(process.cwd(), source)
     const outputDir = resolve(process.cwd(), options.output)
 
@@ -164,8 +194,8 @@ program
       console.log(`  Generated: ${indexPath}`)
 
       console.log(`\n✓ Types generated in ${options.output}/`)
-    } catch (err: any) {
-      console.error(`Error: ${err.message}`)
+    } catch (err: unknown) {
+      console.error(`Error: ${err instanceof Error ? err.message : String(err)}`)
       process.exit(1)
     }
   })
@@ -178,7 +208,7 @@ program
   .command('login')
   .description('Authenticate with objects.do')
   .option('--token <token>', 'API token')
-  .action(async (options) => {
+  .action(async (_options: LoginCommandOptions) => {
     // TODO: Implement OAuth flow or token-based login
     console.log('Login flow coming soon...')
     console.log('For now, set DOTDO_TOKEN environment variable')
@@ -192,7 +222,7 @@ program
   .command('list')
   .description('List your published DOs')
   .option('--registry <url>', 'Registry URL', 'https://objects.do')
-  .action(async (options) => {
+  .action(async (options: ListCommandOptions) => {
     const token = process.env.DOTDO_TOKEN
     if (!token) {
       console.error('Error: Auth token required. Set DOTDO_TOKEN')
@@ -201,14 +231,14 @@ program
 
     try {
       const response = await fetch(`${options.registry}/api/list`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       })
 
       if (!response.ok) {
         throw new Error(`Failed to list: ${response.statusText}`)
       }
 
-      const dos = await response.json() as Array<{ id: string; updatedAt: string }>
+      const dos = (await response.json()) as Array<{ id: string; updatedAt: string }>
 
       if (dos.length === 0) {
         console.log('No DOs published yet.')
@@ -222,8 +252,8 @@ program
         console.log(`    URL: ${options.registry}/${d.id}`)
         console.log('')
       }
-    } catch (err: any) {
-      console.error(`Error: ${err.message}`)
+    } catch (err: unknown) {
+      console.error(`Error: ${err instanceof Error ? err.message : String(err)}`)
       process.exit(1)
     }
   })
@@ -237,7 +267,7 @@ program
   .description('Delete a published DO')
   .option('--registry <url>', 'Registry URL', 'https://objects.do')
   .option('--force', 'Skip confirmation')
-  .action(async (id: string, options) => {
+  .action(async (id: string, options: DeleteCommandOptions) => {
     const token = process.env.DOTDO_TOKEN
     if (!token) {
       console.error('Error: Auth token required. Set DOTDO_TOKEN')
@@ -253,7 +283,7 @@ program
     try {
       const response = await fetch(`${options.registry}/${id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       })
 
       if (!response.ok) {
@@ -261,8 +291,8 @@ program
       }
 
       console.log(`✓ Deleted: ${id}`)
-    } catch (err: any) {
-      console.error(`Error: ${err.message}`)
+    } catch (err: unknown) {
+      console.error(`Error: ${err instanceof Error ? err.message : String(err)}`)
       process.exit(1)
     }
   })

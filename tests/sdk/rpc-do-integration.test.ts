@@ -217,12 +217,13 @@ describe('Simplified RPC Factory', () => {
    */
   it('should auto-detect HTTP transport from https:// URL', () => {
     // This should work with just a URL string
-    const client = RPC('https://api.do.md')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = RPC('https://api.do.md') as any
 
     expect(client).toBeDefined()
     expect(typeof client).toBe('object')
 
-    // Client should have proxy capabilities
+    // Client should have proxy capabilities (accessed via Proxy)
     expect(client.things).toBeDefined()
     expect(typeof client.things.list).toBe('function')
   })
@@ -1026,7 +1027,7 @@ describe('Type Safety', () => {
    * WILL FAIL: Generic type parameter may not work
    */
   it('should support generic type parameter for collections', () => {
-    interface User {
+    interface User extends Record<string, unknown> {
       id: string
       name: string
       active: boolean

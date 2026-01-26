@@ -10,7 +10,7 @@ import {
   ThingCollection,
   ActionCollection,
   RelationshipCollection,
-} from '../../db/collections/index.js'
+} from '../../../db/collections/index.js'
 
 export class CollectionsDO extends DurableObject<Env> {
   nouns = new NounCollection(this.ctx)

@@ -76,7 +76,7 @@ class WebSocketPairPolyfill {
 }
 
 // Install WebSocketPair globally for node tests
-if (typeof globalThis.WebSocketPair === 'undefined') {
+if (typeof (globalThis as Record<string, unknown>).WebSocketPair === 'undefined') {
   ;(globalThis as Record<string, unknown>).WebSocketPair = WebSocketPairPolyfill
 }
 

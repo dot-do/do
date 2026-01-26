@@ -44,5 +44,12 @@
     "tests/**/*",
     "index.ts"
   ],
-  "exclude": ["node_modules", "dist", "proxy", "tail"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "proxy",
+    "tail",
+    "tests/storage.workers.test.ts",
+    "tests/benchmarks/**/*"
+  ]
 }

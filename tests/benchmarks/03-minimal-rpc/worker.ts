@@ -21,8 +21,9 @@ interface RpcResponse {
 }
 
 export class MinimalRpcDO extends DurableObject<Env> {
-  // RPC methods
-  private methods: Record<string, (...args: unknown[]) => Promise<unknown>> = {
+  // RPC methods - use any for flexibility in this benchmark
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private methods: Record<string, (...args: any[]) => Promise<any>> = {
     ping: async () => 'pong',
     echo: async (msg: string) => msg,
     add: async (a: number, b: number) => a + b,
