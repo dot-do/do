@@ -7,17 +7,17 @@
  *
  * Every DO is data - API methods, events, schedules, site/app content.
  *
- * RPC Transport:
- * - Root path `/` serves CapnWeb protocol (primary transport for rpc.do clients)
+ * RPC Transport (CapnWeb only - no JSON-RPC):
+ * - Root path `/` serves CapnWeb protocol exclusively
  * - HTTP POST to `/` → capnweb HTTP batch
  * - WebSocket upgrade to `/` → capnweb WebSocket
- * - GET to `/` → site content (default)
+ * - GET to `/` → site content
  */
 
-import type { DODefinition, DOContext, Env, RPCRequest, RPCResponse, APIMethodDefinition } from './types'
-import { createContext, resolveMethod, resolveMethodCode, flattenAPIMethods } from './context'
+import type { DODefinition, DOContext, Env, APIMethodDefinition } from './types'
+import { createContext, resolveMethod, flattenAPIMethods } from './context'
 import { executeFunction, validateFunctionCode } from './executor'
-import { safeParseDODefinition, RPC_ERROR_CODES, createRPCError, createRPCSuccess } from './schema'
+import { safeParseDODefinition } from './schema'
 
 // CapnWeb server-side types and lazy loading
 interface CapnWebModule {
@@ -101,8 +101,8 @@ export class DO {
 
     // Route request based on path
 
-    // Root path `/` - CapnWeb protocol (primary transport)
-    // POST → HTTP batch, WebSocket upgrade → WS, GET → site
+    // Root path `/` - CapnWeb protocol (ONLY RPC transport)
+    // POST → capnweb HTTP batch, WebSocket upgrade → capnweb WS, GET → site
     if (path === '/' || path === '') {
       const method = request.method.toUpperCase()
       const isWebSocketUpgrade = request.headers.get('Upgrade')?.toLowerCase() === 'websocket'
@@ -111,11 +111,6 @@ export class DO {
         return this.handleCapnWeb(request)
       }
       // GET falls through to handleSite
-    }
-
-    // Legacy JSON-RPC at /rpc and REST at /api/*
-    if (path === '/rpc' || path.startsWith('/api/')) {
-      return this.handleRPC(request, path)
     }
 
     if (path === '/__schema') {
@@ -301,176 +296,6 @@ export class DO {
     }
 
     return buildTarget(definition.api)
-  }
-
-  // ===========================================================================
-  // RPC Handling (Legacy JSON-RPC)
-  // ===========================================================================
-
-  /**
-   * Handle RPC requests (JSON-RPC and REST-style)
-   */
-  private async handleRPC(request: Request, path: string): Promise<Response> {
-    const { definition, $ } = this.ensureLoaded()
-
-    // Handle REST-style API routes
-    if (path.startsWith('/api/')) {
-      return this.handleRESTRoute(request, path, definition, $)
-    }
-
-    // Handle JSON-RPC
-    let body: unknown
-    try {
-      body = await request.json()
-    } catch {
-      return Response.json(createRPCError(RPC_ERROR_CODES.PARSE_ERROR, 'Invalid JSON'), { status: 400 })
-    }
-
-    // Handle batch requests
-    if (Array.isArray(body)) {
-      const results = await Promise.all(body.map((req) => this.executeRPCRequest(req, definition, $)))
-      return Response.json(results)
-    }
-
-    // Handle single request
-    const result = await this.executeRPCRequest(body as RPCRequest, definition, $)
-
-    // Return 404 for method not found
-    if (result.error?.code === RPC_ERROR_CODES.METHOD_NOT_FOUND) {
-      return Response.json(result, { status: 404 })
-    }
-
-    return Response.json(result)
-  }
-
-  /**
-   * Execute a single RPC request
-   */
-  private async executeRPCRequest(
-    request: RPCRequest,
-    definition: DODefinition,
-    $: DOContext
-  ): Promise<RPCResponse> {
-    const { method, params = [], id } = request
-    const isJsonRpc = 'jsonrpc' in request
-
-    // Find method code and params
-    const resolved = resolveMethod(definition.api, method)
-    if (!resolved) {
-      const error = createRPCError(RPC_ERROR_CODES.METHOD_NOT_FOUND, `Method not found: ${method}`, undefined, id)
-      if (isJsonRpc) {
-        return { jsonrpc: '2.0', ...error } as RPCResponse
-      }
-      return error
-    }
-
-    const { code, params: methodParams } = resolved
-
-    // Validate code for security
-    const validation = validateFunctionCode(code)
-    if (!validation.valid) {
-      const error = createRPCError(RPC_ERROR_CODES.EXECUTION_ERROR, validation.reason || 'Security error', undefined, id)
-      if (isJsonRpc) {
-        return { jsonrpc: '2.0', ...error } as RPCResponse
-      }
-      return error
-    }
-
-    // Execute function with method params
-    const result = await executeFunction(code, $, params, { methodParams }, { LOADER: this.env.LOADER })
-
-    if (!result.success) {
-      // Use -32000 (generic server error) for execution failures per JSON-RPC convention
-      const error = createRPCError(
-        -32000 as typeof RPC_ERROR_CODES[keyof typeof RPC_ERROR_CODES],
-        result.error?.message || 'Execution failed',
-        result.error,
-        id
-      )
-      if (isJsonRpc) {
-        return { jsonrpc: '2.0', ...error } as RPCResponse
-      }
-      return error
-    }
-
-    const response = createRPCSuccess(result.result, id)
-    if (isJsonRpc) {
-      return { jsonrpc: '2.0', ...response } as RPCResponse
-    }
-    return response
-  }
-
-  /**
-   * Handle REST-style API routes
-   */
-  private async handleRESTRoute(
-    request: Request,
-    path: string,
-    definition: DODefinition,
-    $: DOContext
-  ): Promise<Response> {
-    // Parse path: /api/users/123 -> namespace=users, id=123
-    const apiPath = path.replace(/^\/api\//, '')
-    const parts = apiPath.split('/').filter(Boolean)
-
-    if (parts.length === 0) {
-      return Response.json({ error: 'Invalid API path' }, { status: 400 })
-    }
-
-    const method = request.method.toUpperCase()
-    let methodName: string
-    let params: unknown[] = []
-
-    if (parts.length === 1) {
-      // /api/users -> users.list (GET) or users.create (POST)
-      const namespace = parts[0]
-      methodName = method === 'POST' ? `${namespace}.create` : `${namespace}.list`
-    } else {
-      // /api/users/123 -> users.get (GET) or users.update (PUT) or users.delete (DELETE)
-      const namespace = parts[0]
-      const id = parts[1]
-
-      switch (method) {
-        case 'GET':
-          methodName = `${namespace}.get`
-          params = [id]
-          break
-        case 'PUT':
-        case 'PATCH':
-          methodName = `${namespace}.update`
-          params = [id, await request.json().catch(() => ({}))]
-          break
-        case 'DELETE':
-          methodName = `${namespace}.delete`
-          params = [id]
-          break
-        default:
-          methodName = `${namespace}.${parts.slice(1).join('.')}`
-      }
-    }
-
-    // If POST/PUT/PATCH with body, add body to params
-    if ((method === 'POST' || method === 'PUT' || method === 'PATCH') && parts.length === 1) {
-      try {
-        const body = await request.json()
-        params.push(body)
-      } catch {
-        // No body
-      }
-    }
-
-    // Find and execute method
-    const resolved = resolveMethod(definition.api, methodName)
-    if (!resolved) {
-      return Response.json({ error: `Method not found: ${methodName}` }, { status: 404 })
-    }
-
-    const result = await executeFunction(resolved.code, $, params, { methodParams: resolved.params }, { LOADER: this.env.LOADER })
-    if (!result.success) {
-      return Response.json({ error: result.error?.message }, { status: 500 })
-    }
-
-    return Response.json(result.result)
   }
 
   // ===========================================================================
