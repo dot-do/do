@@ -115,6 +115,26 @@ export { executeFunction, validateFunctionCode, type ExecuteOptions } from './ex
 export { DO } from './DO'
 
 // =============================================================================
+// Error & CORS Exports
+// =============================================================================
+
+export { APIError, ERROR_CODES, type ErrorCode, unauthorized, invalidToken, forbidden, notFound, invalidJSON, internalError } from './errors'
+
+export { CORS_HEADERS, jsonResponse, errorResponse, preflightResponse, handlePreflight, addCorsHeaders } from './cors'
+
+// =============================================================================
+// Auth Export
+// =============================================================================
+
+export { authenticate, type AuthResult, requiresAuth } from './auth'
+
+// =============================================================================
+// Registry Export
+// =============================================================================
+
+export { handleRegistryAPI, extractSchema } from './registry'
+
+// =============================================================================
 // Worker Environment
 // =============================================================================
 
@@ -153,7 +173,7 @@ interface R2Bucket {
   get(key: string): Promise<R2Object | null>
   put(key: string, value: string | ArrayBuffer | ReadableStream): Promise<R2Object>
   delete(key: string): Promise<void>
-  list(options?: { prefix?: string }): Promise<{ objects: R2Object[] }>
+  list(options?: { prefix?: string; limit?: number; cursor?: string }): Promise<{ objects: R2Object[]; truncated: boolean; cursor?: string }>
 }
 
 interface R2Object {
@@ -171,11 +191,26 @@ interface Fetcher {
 // Worker Entry Point - The Service Hub (`do`)
 // =============================================================================
 
+import { handleRegistryAPI } from './registry'
+import { handlePreflight } from './cors'
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
     const path = url.pathname
     const host = url.hostname
+    const method = request.method
+
+    // Handle OPTIONS preflight
+    const preflightResponse = handlePreflight(request)
+    if (preflightResponse) {
+      return preflightResponse
+    }
+
+    // Registry API routes
+    if (path.startsWith('/registry')) {
+      return handleRegistryAPI(request, env, path, method, url)
+    }
 
     // Service routing by path prefix
     if (path.startsWith('/auth/') || path === '/auth') {
@@ -221,8 +256,8 @@ export default {
         description: 'objects.do - Universal DO Runtime & Service Hub',
         usage: {
           do: 'Service binding name for RPC execution',
-          DO: 'Durable Object class for Digital Objects'
-        }
+          DO: 'Durable Object class for Digital Objects',
+        },
       })
     }
 
@@ -234,14 +269,14 @@ export default {
         description: 'Universal DO Runtime & Service Hub',
         bindings: {
           do: 'Universal RPC execution (services + DOs)',
-          DO: 'Digital/Durable Object class'
+          DO: 'Digital/Durable Object class',
         },
         services: ['auth', 'oauth', 'mcp', 'esbuild', 'stripe', 'github', 'ai', 'mdx'],
         usage: {
           services: 'GET /auth, /oauth, /stripe, /github, /ai, /esbuild, /mcp',
           rpc: 'POST /rpc { method: "service.method", params: [...] }',
-          do: 'GET|POST /:doId/...'
-        }
+          do: 'GET|POST /:doId/...',
+        },
       })
     }
 
@@ -250,38 +285,45 @@ export default {
     const stub = env.DO.get(id)
 
     // Rewrite the path to remove the DO ID prefix if present
-    const doPath = path.startsWith(`/${doId}`)
-      ? path.slice(doId.length + 1) || '/'
-      : path
+    const doPath = path.startsWith(`/${doId}`) ? path.slice(doId.length + 1) || '/' : path
 
     const doUrl = new URL(request.url)
     doUrl.pathname = doPath
 
     return stub.fetch(new Request(doUrl.toString(), request))
-  }
+  },
 }
 
 // =============================================================================
 // Helper Functions
 // =============================================================================
 
+/**
+ * Routes a request to a service binding
+ */
 function routeToService(service: Fetcher, request: Request, prefix: string): Promise<Response> {
   const url = new URL(request.url)
   url.pathname = url.pathname.slice(prefix.length) || '/'
   return service.fetch(new Request(url.toString(), request))
 }
 
+/**
+ * Handles unified RPC requests that route to services
+ */
 async function handleUnifiedRPC(request: Request, env: Env): Promise<Response> {
   try {
-    const body = await request.json() as { method: string; params?: unknown[]; id?: string | number }
+    const body = (await request.json()) as { method: string; params?: unknown[]; id?: string | number }
     const { method, params = [], id } = body
 
     const dotIndex = method.indexOf('.')
     if (dotIndex === -1) {
-      return Response.json({
-        error: { code: -32601, message: 'Method must be service.method format' },
-        id
-      }, { status: 400 })
+      return Response.json(
+        {
+          error: { code: -32601, message: 'Method must be service.method format' },
+          id,
+        },
+        { status: 400 }
+      )
     }
 
     const service = method.slice(0, dotIndex)
@@ -289,24 +331,36 @@ async function handleUnifiedRPC(request: Request, env: Env): Promise<Response> {
 
     const fetcher = getService(service, env)
     if (!fetcher) {
-      return Response.json({
-        error: { code: -32601, message: `Unknown service: ${service}` },
-        id
-      }, { status: 404 })
+      return Response.json(
+        {
+          error: { code: -32601, message: `Unknown service: ${service}` },
+          id,
+        },
+        { status: 404 }
+      )
     }
 
-    return fetcher.fetch(new Request('http://internal/rpc', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ method: serviceMethod, params, id })
-    }))
-  } catch (err: any) {
-    return Response.json({
-      error: { code: -32700, message: err.message }
-    }, { status: 400 })
+    return fetcher.fetch(
+      new Request('http://internal/rpc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ method: serviceMethod, params, id }),
+      })
+    )
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    return Response.json(
+      {
+        error: { code: -32700, message },
+      },
+      { status: 400 }
+    )
   }
 }
 
+/**
+ * Gets a service fetcher by name
+ */
 function getService(name: string, env: Env): Fetcher | null {
   const services: Record<string, Fetcher | undefined> = {
     auth: env.AUTH,
@@ -321,6 +375,9 @@ function getService(name: string, env: Env): Fetcher | null {
   return services[name.toLowerCase()] || null
 }
 
+/**
+ * Extracts the DO ID from host or path
+ */
 function extractDOId(host: string, path: string): string | null {
   // If hostname is not objects.do, the hostname IS the DO ID
   if (!host.includes('objects.do') && !host.includes('localhost')) {
@@ -328,7 +385,7 @@ function extractDOId(host: string, path: string): string | null {
   }
 
   // Extract from path: /:doId/...
-  const match = path.match(/^\/([^\/]+\.do)(\/|$)/)
+  const match = path.match(/^\/([^/]+\.do)(\/|$)/)
   if (match) {
     return match[1]
   }
@@ -359,14 +416,10 @@ type RPCTarget = Record<string, unknown>
  * export default RPC((env) => new Stripe(env.STRIPE_KEY))
  * ```
  */
-export function RPC<T extends RPCTarget>(
-  target: T | ((env: unknown) => T | Promise<T>)
-): ExportedHandler {
+export function RPC<T extends RPCTarget>(target: T | ((env: unknown) => T | Promise<T>)): ExportedHandler {
   return {
     async fetch(request: Request, env: unknown): Promise<Response> {
-      const resolvedTarget = typeof target === 'function'
-        ? await (target as (env: unknown) => T | Promise<T>)(env)
-        : target
+      const resolvedTarget = typeof target === 'function' ? await (target as (env: unknown) => T | Promise<T>)(env) : target
 
       const url = new URL(request.url)
 
@@ -383,14 +436,19 @@ export function RPC<T extends RPCTarget>(
       }
 
       return Response.json({ endpoints: ['POST /', 'GET /__schema'] })
-    }
+    },
   }
 }
 
+/**
+ * Handles RPC requests to a service target
+ */
 async function handleServiceRPC(request: Request, target: RPCTarget): Promise<Response> {
   try {
-    const { method, params = [], id } = await request.json() as {
-      method: string; params?: unknown[]; id?: string | number
+    const { method, params = [], id } = (await request.json()) as {
+      method: string
+      params?: unknown[]
+      id?: string | number
     }
 
     const fn = resolveMethod(target, method)
@@ -400,11 +458,15 @@ async function handleServiceRPC(request: Request, target: RPCTarget): Promise<Re
 
     const result = await fn(...params)
     return Response.json({ result, id })
-  } catch (err: any) {
-    return Response.json({ error: { code: -32603, message: err.message } }, { status: 500 })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    return Response.json({ error: { code: -32603, message } }, { status: 500 })
   }
 }
 
+/**
+ * Resolves a method path to a callable function
+ */
 function resolveMethod(target: RPCTarget, path: string): ((...args: unknown[]) => unknown) | null {
   const parts = path.split('.')
   let current: unknown = target
@@ -422,6 +484,9 @@ function resolveMethod(target: RPCTarget, path: string): ((...args: unknown[]) =
   return null
 }
 
+/**
+ * Generates RPC schema from a target object
+ */
 function generateRPCSchema(target: RPCTarget, prefix = ''): object {
   const methods: Array<{ name: string; path: string }> = []
   const namespaces: Array<{ name: string; methods: Array<{ name: string; path: string }> }> = []
