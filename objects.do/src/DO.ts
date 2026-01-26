@@ -7,11 +7,13 @@
  *
  * Every DO is data - API methods, events, schedules, site/app content.
  *
- * RPC Transport (CapnWeb only - no JSON-RPC):
- * - Root path `/` serves CapnWeb protocol exclusively
- * - HTTP POST to `/` → capnweb HTTP batch
- * - WebSocket upgrade to `/` → capnweb WebSocket
- * - GET to `/` → site content
+ * RPC Transport Architecture:
+ * - Root path `/` serves native CapnWeb protocol (HTTP batch + WebSocket)
+ * - `/rpc` accepts JSON-RPC format, translates to capnweb internally
+ * - `/api/*` accepts REST format, translates to capnweb internally
+ *
+ * All three endpoints use the same underlying capnweb localMain target,
+ * ensuring consistent behavior regardless of client protocol.
  */
 
 import type { DODefinition, DOContext, Env, APIMethodDefinition } from './types'
@@ -101,7 +103,7 @@ export class DO {
 
     // Route request based on path
 
-    // Root path `/` - CapnWeb protocol (ONLY RPC transport)
+    // Root path `/` - Native CapnWeb protocol
     // POST → capnweb HTTP batch, WebSocket upgrade → capnweb WS, GET → site
     if (path === '/' || path === '') {
       const method = request.method.toUpperCase()
@@ -111,6 +113,17 @@ export class DO {
         return this.handleCapnWeb(request)
       }
       // GET falls through to handleSite
+    }
+
+    // /rpc - JSON-RPC format that translates to capnweb
+    // Supports both body-based ({ method, params }) and path-based (/rpc/ai.generate)
+    if (path === '/rpc' || path.startsWith('/rpc/')) {
+      return this.handleJSONRPC(request, path)
+    }
+
+    // /api/* - REST format that translates to capnweb
+    if (path.startsWith('/api/')) {
+      return this.handleRESTAPI(request, path)
     }
 
     if (path === '/__schema') {
@@ -296,6 +309,276 @@ export class DO {
     }
 
     return buildTarget(definition.api)
+  }
+
+  // ===========================================================================
+  // JSON-RPC Translation Layer
+  // ===========================================================================
+
+  /**
+   * Handle JSON-RPC requests that translate to capnweb
+   *
+   * Supports two formats:
+   * 1. Body-based: POST /rpc with { method: "ai.generate", params: [...] }
+   * 2. Path-based: POST /rpc/ai.generate with params in body or query
+   *    - Also supports /rpc/$.ai.generate syntax
+   *
+   * Both translate to calls on the capnweb localMain target.
+   */
+  private async handleJSONRPC(request: Request, path: string): Promise<Response> {
+    const { definition, $ } = this.ensureLoaded()
+    const localMain = this.createCapnWebTarget(definition, $)
+
+    // Extract method from path if present
+    let methodFromPath: string | null = null
+    if (path !== '/rpc' && path.startsWith('/rpc/')) {
+      methodFromPath = path.slice(5) // Remove '/rpc/'
+      // Support /rpc/$.method syntax - strip leading $. if present
+      if (methodFromPath.startsWith('$.')) {
+        methodFromPath = methodFromPath.slice(2)
+      }
+    }
+
+    // Parse body for JSON-RPC request
+    let body: { method?: string; params?: unknown[]; id?: string | number } = {}
+    if (request.method === 'POST') {
+      try {
+        body = await request.json()
+      } catch {
+        // If no body, that's ok for path-based calls
+      }
+    }
+
+    // Determine method name (path takes precedence if present)
+    const method = methodFromPath || body.method
+    if (!method) {
+      return Response.json(
+        { jsonrpc: '2.0', error: { code: -32600, message: 'Method not specified' }, id: body.id || null },
+        { status: 400 }
+      )
+    }
+
+    // Get params from body, query string, or empty array
+    let params: unknown[] = []
+    if (body.params && Array.isArray(body.params)) {
+      params = body.params
+    } else if (body.params && typeof body.params === 'object') {
+      // Convert named params to array using method definition order
+      const resolved = resolveMethod(definition.api, method)
+      if (resolved?.params) {
+        params = resolved.params.map((p) => (body.params as Record<string, unknown>)[p])
+      } else {
+        params = Object.values(body.params)
+      }
+    } else if (methodFromPath) {
+      // For path-based calls, check query string or body as single param
+      const url = new URL(request.url)
+      const queryParams = Object.fromEntries(url.searchParams)
+      if (Object.keys(queryParams).length > 0) {
+        const resolved = resolveMethod(definition.api, method)
+        if (resolved?.params) {
+          params = resolved.params.map((p) => queryParams[p])
+        } else {
+          params = Object.values(queryParams)
+        }
+      }
+    }
+
+    // Navigate localMain to find the method
+    const methodParts = method.split('.')
+    let target: unknown = localMain
+    for (const part of methodParts.slice(0, -1)) {
+      if (target && typeof target === 'object' && part in target) {
+        target = (target as Record<string, unknown>)[part]
+      } else {
+        return Response.json(
+          { jsonrpc: '2.0', error: { code: -32601, message: `Method not found: ${method}` }, id: body.id || null },
+          { status: 404 }
+        )
+      }
+    }
+
+    const methodName = methodParts[methodParts.length - 1]
+    const fn = target && typeof target === 'object' ? (target as Record<string, unknown>)[methodName] : undefined
+
+    if (typeof fn !== 'function') {
+      return Response.json(
+        { jsonrpc: '2.0', error: { code: -32601, message: `Method not found: ${method}` }, id: body.id || null },
+        { status: 404 }
+      )
+    }
+
+    try {
+      const result = await fn(...params)
+      return Response.json({ jsonrpc: '2.0', result, id: body.id || null })
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error))
+      return Response.json(
+        { jsonrpc: '2.0', error: { code: -32000, message: err.message }, id: body.id || null },
+        { status: 500 }
+      )
+    }
+  }
+
+  // ===========================================================================
+  // REST API Translation Layer
+  // ===========================================================================
+
+  /**
+   * Handle REST API requests that translate to capnweb
+   *
+   * Maps REST paths to capnweb method calls:
+   * - GET /api/users → $.users() or $.users.list()
+   * - POST /api/users → $.users.create(body)
+   * - GET /api/users/123 → $.users.get('123')
+   * - PUT /api/users/123 → $.users.update('123', body)
+   * - DELETE /api/users/123 → $.users.delete('123')
+   *
+   * Also supports explicit method paths:
+   * - POST /api/ai.generate → $.ai.generate(body)
+   */
+  private async handleRESTAPI(request: Request, path: string): Promise<Response> {
+    const { definition, $ } = this.ensureLoaded()
+    const localMain = this.createCapnWebTarget(definition, $)
+    const httpMethod = request.method.toUpperCase()
+
+    // Remove /api/ prefix
+    const apiPath = path.slice(5) // '/api/'.length
+    const segments = apiPath.split('/').filter(Boolean)
+
+    if (segments.length === 0) {
+      return Response.json({ error: 'API path required' }, { status: 400 })
+    }
+
+    // Parse body for POST/PUT/PATCH
+    let body: unknown = undefined
+    if (['POST', 'PUT', 'PATCH'].includes(httpMethod)) {
+      try {
+        body = await request.json()
+      } catch {
+        // Body is optional
+      }
+    }
+
+    // Handle dot-notation paths (e.g., /api/ai.generate)
+    if (segments.length === 1 && segments[0].includes('.')) {
+      const method = segments[0]
+      const methodParts = method.split('.')
+      let target: unknown = localMain
+
+      for (const part of methodParts.slice(0, -1)) {
+        if (target && typeof target === 'object' && part in target) {
+          target = (target as Record<string, unknown>)[part]
+        } else {
+          return Response.json({ error: `Method not found: ${method}` }, { status: 404 })
+        }
+      }
+
+      const methodName = methodParts[methodParts.length - 1]
+      const fn = target && typeof target === 'object' ? (target as Record<string, unknown>)[methodName] : undefined
+
+      if (typeof fn !== 'function') {
+        return Response.json({ error: `Method not found: ${method}` }, { status: 404 })
+      }
+
+      try {
+        const params = body !== undefined ? (Array.isArray(body) ? body : [body]) : []
+        const result = await fn(...params)
+        return Response.json(result)
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error))
+        return Response.json({ error: err.message }, { status: 500 })
+      }
+    }
+
+    // Standard REST resource handling
+    // Navigate to the resource namespace
+    let target: unknown = localMain
+    const resourcePath = segments.slice(0, -1).length > 0 ? segments.slice(0, -1) : segments
+    const lastSegment = segments[segments.length - 1]
+    const isIdSegment = segments.length > 1 && !localMain.hasOwnProperty(segments.join('.'))
+
+    for (const segment of (isIdSegment ? segments.slice(0, -1) : segments)) {
+      if (target && typeof target === 'object' && segment in target) {
+        target = (target as Record<string, unknown>)[segment]
+      } else {
+        return Response.json({ error: `Resource not found: ${segment}` }, { status: 404 })
+      }
+    }
+
+    // Determine which method to call based on HTTP method and whether we have an ID
+    let methodName: string
+    let params: unknown[] = []
+
+    if (isIdSegment) {
+      const id = lastSegment
+      switch (httpMethod) {
+        case 'GET':
+          methodName = 'get'
+          params = [id]
+          break
+        case 'PUT':
+        case 'PATCH':
+          methodName = 'update'
+          params = [id, body]
+          break
+        case 'DELETE':
+          methodName = 'delete'
+          params = [id]
+          break
+        default:
+          return Response.json({ error: `Method ${httpMethod} not allowed` }, { status: 405 })
+      }
+    } else {
+      switch (httpMethod) {
+        case 'GET':
+          // Try 'list' first, then treat as callable namespace
+          methodName = 'list'
+          break
+        case 'POST':
+          methodName = 'create'
+          params = body !== undefined ? [body] : []
+          break
+        default:
+          return Response.json({ error: `Method ${httpMethod} not allowed` }, { status: 405 })
+      }
+    }
+
+    // If target is callable directly (not a namespace), call it
+    if (typeof target === 'function') {
+      try {
+        const result = await target(...params)
+        return Response.json(result)
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error))
+        return Response.json({ error: err.message }, { status: 500 })
+      }
+    }
+
+    // Otherwise look for the method on the target
+    const fn = target && typeof target === 'object' ? (target as Record<string, unknown>)[methodName] : undefined
+
+    if (typeof fn !== 'function') {
+      // For GET without 'list', maybe the namespace itself is callable
+      if (httpMethod === 'GET' && typeof target === 'function') {
+        try {
+          const result = await target()
+          return Response.json(result)
+        } catch (error) {
+          const err = error instanceof Error ? error : new Error(String(error))
+          return Response.json({ error: err.message }, { status: 500 })
+        }
+      }
+      return Response.json({ error: `Method ${methodName} not found on resource` }, { status: 404 })
+    }
+
+    try {
+      const result = await fn(...params)
+      return Response.json(result)
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error))
+      return Response.json({ error: err.message }, { status: 500 })
+    }
   }
 
   // ===========================================================================
