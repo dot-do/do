@@ -1243,11 +1243,33 @@ export interface RegistryMetrics {
 // =============================================================================
 
 /**
+ * Worker Loader binding for sandboxed code execution
+ * @see https://developers.cloudflare.com/workers/runtime-apis/bindings/worker-loader/
+ */
+export interface WorkerLoader {
+  get(
+    id: string,
+    factory: () => Promise<{
+      compatibilityDate: string
+      mainModule: string
+      modules: Record<string, string>
+      env?: Record<string, unknown>
+      globalOutbound?: null // Set to null to block network
+    }>
+  ): {
+    getEntrypoint(): { fetch(request: Request | string): Promise<Response> }
+  }
+}
+
+/**
  * Worker environment bindings
  */
 export interface Env {
   /** Registry R2 bucket */
   REGISTRY: R2Bucket
+
+  /** Worker loader for sandboxed code execution */
+  LOADER?: WorkerLoader
 
   /** Generic DO namespace (optional - may not be needed for all operations) */
   OBJECTS?: DurableObjectNamespace

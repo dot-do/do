@@ -9,7 +9,7 @@
  */
 
 import type { DODefinition, DOContext, Env, RPCRequest, RPCResponse, APIMethodDefinition } from './types'
-import { createContext, resolveMethodCode, flattenAPIMethods } from './context'
+import { createContext, resolveMethod, resolveMethodCode, flattenAPIMethods } from './context'
 import { executeFunction, validateFunctionCode } from './executor'
 import { safeParseDODefinition, RPC_ERROR_CODES, createRPCError, createRPCSuccess } from './schema'
 
@@ -28,14 +28,21 @@ import { safeParseDODefinition, RPC_ERROR_CODES, createRPCError, createRPCSucces
  * - MCP (Model Context Protocol) for AI agents
  */
 export class DO {
+  private ctx: DurableObjectState
   private state: DurableObjectState
   private env: Env
   private definition: DODefinition | null = null
   private $: DOContext | null = null
+  private doName: string | null = null
 
   constructor(state: DurableObjectState, env: Env) {
+    this.ctx = state
     this.state = state
     this.env = env
+    // Load stored name in blockConcurrencyWhile to ensure it's ready
+    state.blockConcurrencyWhile(async () => {
+      this.doName = await state.storage.get<string>('__do_name') ?? null
+    })
   }
 
   /**
@@ -44,6 +51,14 @@ export class DO {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url)
     const path = url.pathname
+
+    // Store the DO name from header (passed by worker) if not already stored
+    const headerName = request.headers.get('X-DO-Name')
+    if (headerName && !this.doName) {
+      this.doName = headerName
+      // Persist to storage for future requests
+      await this.ctx.storage.put('__do_name', headerName)
+    }
 
     // Handle PUT for definition update (before loading definition)
     if (request.method === 'PUT' && (path === '/' || path === '')) {
@@ -91,19 +106,27 @@ export class DO {
    * Load DO definition from registry
    */
   private async loadDefinition(): Promise<{ success: true } | { success: false; response: Response }> {
-    const id = this.state.id.name || this.state.id.toString()
+    // Use the stored DO name (passed via X-DO-Name header and persisted to storage)
+    const id = this.doName
+
+    if (!id) {
+      return {
+        success: false,
+        response: Response.json({ error: 'DO name not set - request must include X-DO-Name header' }, { status: 400 }),
+      }
+    }
 
     try {
       const obj = await this.env.REGISTRY.get(id)
       if (!obj) {
         return {
           success: false,
-          response: Response.json({ error: 'Definition not found' }, { status: 404 }),
+          response: Response.json({ error: 'Definition not found', id }, { status: 404 }),
         }
       }
 
-      const data = await obj.json()
-      const parseResult = safeParseDODefinition(data)
+      const entry = await obj.json<{ definition: unknown }>()
+      const parseResult = safeParseDODefinition(entry.definition)
 
       if (!parseResult.success) {
         return {
@@ -188,15 +211,17 @@ export class DO {
     const { method, params = [], id } = request
     const isJsonRpc = 'jsonrpc' in request
 
-    // Find method code
-    const code = resolveMethodCode(definition.api, method)
-    if (!code) {
+    // Find method code and params
+    const resolved = resolveMethod(definition.api, method)
+    if (!resolved) {
       const error = createRPCError(RPC_ERROR_CODES.METHOD_NOT_FOUND, `Method not found: ${method}`, undefined, id)
       if (isJsonRpc) {
         return { jsonrpc: '2.0', ...error } as RPCResponse
       }
       return error
     }
+
+    const { code, params: methodParams } = resolved
 
     // Validate code for security
     const validation = validateFunctionCode(code)
@@ -208,8 +233,8 @@ export class DO {
       return error
     }
 
-    // Execute function
-    const result = await executeFunction(code, $, params)
+    // Execute function with method params
+    const result = await executeFunction(code, $, params, { methodParams }, { LOADER: this.env.LOADER })
 
     if (!result.success) {
       // Use -32000 (generic server error) for execution failures per JSON-RPC convention
@@ -292,12 +317,12 @@ export class DO {
     }
 
     // Find and execute method
-    const code = resolveMethodCode(definition.api, methodName)
-    if (!code) {
+    const resolved = resolveMethod(definition.api, methodName)
+    if (!resolved) {
       return Response.json({ error: `Method not found: ${methodName}` }, { status: 404 })
     }
 
-    const result = await executeFunction(code, $, params)
+    const result = await executeFunction(resolved.code, $, params, { methodParams: resolved.params }, { LOADER: this.env.LOADER })
     if (!result.success) {
       return Response.json({ error: result.error?.message }, { status: 500 })
     }
@@ -477,7 +502,7 @@ export class DO {
     }
 
     // Execute the event handler
-    const result = await executeFunction(handler, $, [data])
+    const result = await executeFunction(handler, $, [data], {}, { LOADER: this.env.LOADER })
     if (!result.success) {
       return Response.json({ handled: true, error: result.error?.message }, { status: 500 })
     }
@@ -570,9 +595,9 @@ export class DO {
   ): Promise<Response> {
     const { name, arguments: args = {} } = params as { name: string; arguments?: Record<string, unknown> }
 
-    // Find method code
-    const code = resolveMethodCode(definition.api, name)
-    if (!code) {
+    // Find method code and params
+    const resolved = resolveMethod(definition.api, name)
+    if (!resolved) {
       return Response.json(
         {
           content: [{ type: 'text', text: `Method not found: ${name}` }],
@@ -582,19 +607,27 @@ export class DO {
       )
     }
 
-    // Convert arguments object to array
-    const paramMatch = code.match(/^\s*(?:async\s+)?\(?\s*([^)=]*?)\s*\)?\s*=>/)
-    const paramNames = paramMatch
-      ? paramMatch[1]
-          .split(',')
-          .map((p) => p.trim().split('=')[0].trim())
-          .filter(Boolean)
-      : []
+    const { code, params: methodParams } = resolved
 
-    const paramValues = paramNames.map((name) => args[name])
+    // Convert arguments object to array based on method params
+    // If methodParams is defined, use it; otherwise try to extract from code
+    let paramNames: string[]
+    if (methodParams && methodParams.length > 0) {
+      paramNames = methodParams
+    } else {
+      const paramMatch = code.match(/^\s*(?:async\s+)?\(?\s*([^)=]*?)\s*\)?\s*=>/)
+      paramNames = paramMatch
+        ? paramMatch[1]
+            .split(',')
+            .map((p) => p.trim().split('=')[0].trim())
+            .filter(Boolean)
+        : []
+    }
+
+    const paramValues = paramNames.map((pname) => args[pname])
 
     // Execute function
-    const result = await executeFunction(code, $, paramValues)
+    const result = await executeFunction(code, $, paramValues, { methodParams }, { LOADER: this.env.LOADER })
     if (!result.success) {
       return Response.json({
         content: [{ type: 'text', text: result.error?.message || 'Execution failed' }],
@@ -657,6 +690,7 @@ export class DO {
 interface DurableObjectState {
   id: DurableObjectId
   storage: DurableObjectStorage
+  blockConcurrencyWhile<T>(callback: () => Promise<T>): Promise<T>
 }
 
 interface DurableObjectId {

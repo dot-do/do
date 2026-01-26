@@ -561,10 +561,29 @@ export function extractFunctionParams(code: string): string[] {
  * @param methodPath - Dot-separated method path (e.g., 'users.get')
  * @returns Method code string or undefined
  */
+/**
+ * Method resolution result with code and params
+ */
+export interface ResolvedMethod {
+  code: string
+  params?: string[]
+}
+
 export function resolveMethodCode(
   api: Record<string, unknown> | undefined,
   methodPath: string
 ): string | undefined {
+  const resolved = resolveMethod(api, methodPath)
+  return resolved?.code
+}
+
+/**
+ * Resolve a method from the API definition, returning code and params
+ */
+export function resolveMethod(
+  api: Record<string, unknown> | undefined,
+  methodPath: string
+): ResolvedMethod | undefined {
   if (!api) return undefined
 
   const parts = methodPath.split('.')
@@ -577,14 +596,15 @@ export function resolveMethodCode(
     current = (current as Record<string, unknown>)[part]
   }
 
-  // Return the code string
+  // Return the code string (no explicit params)
   if (typeof current === 'string') {
-    return current
+    return { code: current }
   }
 
-  // Handle APIMethodDefinition
+  // Handle APIMethodDefinition with code and params
   if (typeof current === 'object' && current !== null && 'code' in current) {
-    return (current as { code: string }).code
+    const def = current as { code: string; params?: string[] }
+    return { code: def.code, params: def.params }
   }
 
   return undefined

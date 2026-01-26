@@ -297,7 +297,16 @@ export default {
     const doUrl = new URL(request.url)
     doUrl.pathname = doPath
 
-    return stub.fetch(new Request(doUrl.toString(), request))
+    // Pass the DO name via header since it's not available inside the DO
+    const headers = new Headers(request.headers)
+    headers.set('X-DO-Name', doId)
+
+    return stub.fetch(new Request(doUrl.toString(), {
+      method: request.method,
+      headers,
+      body: request.body,
+      redirect: request.redirect,
+    }))
   },
 }
 

@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "ai-evaluate": "^2.2.0",
     "rpc.do": "^0.2.3",
     "zod": "^3.23.0"
   },
