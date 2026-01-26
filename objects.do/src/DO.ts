@@ -6,12 +6,39 @@
  * them without any deployment.
  *
  * Every DO is data - API methods, events, schedules, site/app content.
+ *
+ * RPC Transport:
+ * - Root path `/` serves CapnWeb protocol (primary transport for rpc.do clients)
+ * - HTTP POST to `/` → capnweb HTTP batch
+ * - WebSocket upgrade to `/` → capnweb WebSocket
+ * - GET to `/` → site content (default)
  */
 
 import type { DODefinition, DOContext, Env, RPCRequest, RPCResponse, APIMethodDefinition } from './types'
 import { createContext, resolveMethod, resolveMethodCode, flattenAPIMethods } from './context'
 import { executeFunction, validateFunctionCode } from './executor'
 import { safeParseDODefinition, RPC_ERROR_CODES, createRPCError, createRPCSuccess } from './schema'
+
+// CapnWeb server-side types and lazy loading
+interface CapnWebModule {
+  newHttpBatchRpcResponse?: (request: Request, localMain: unknown) => Promise<Response>
+  newWorkersWebSocketRpcResponse?: (request: Request, localMain: unknown) => Response
+}
+
+let capnwebModule: CapnWebModule | null = null
+
+async function getCapnwebModule(): Promise<CapnWebModule> {
+  if (!capnwebModule) {
+    try {
+      // Dynamic import - uses @dotdo/capnweb fork with additional capabilities
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      capnwebModule = (await import('@dotdo/capnweb' as any)) as CapnWebModule
+    } catch {
+      capnwebModule = {}
+    }
+  }
+  return capnwebModule
+}
 
 // =============================================================================
 // DO Class
@@ -39,10 +66,9 @@ export class DO {
     this.ctx = state
     this.state = state
     this.env = env
-    // Load stored name in blockConcurrencyWhile to ensure it's ready
-    state.blockConcurrencyWhile(async () => {
-      this.doName = await state.storage.get<string>('__do_name') ?? null
-    })
+    // Note: doName is set from X-DO-Name header on each request
+    // We don't use blockConcurrencyWhile for initialization because
+    // the header-based approach is more reliable and avoids race conditions
   }
 
   /**
@@ -74,6 +100,20 @@ export class DO {
     }
 
     // Route request based on path
+
+    // Root path `/` - CapnWeb protocol (primary transport)
+    // POST → HTTP batch, WebSocket upgrade → WS, GET → site
+    if (path === '/' || path === '') {
+      const method = request.method.toUpperCase()
+      const isWebSocketUpgrade = request.headers.get('Upgrade')?.toLowerCase() === 'websocket'
+
+      if (method === 'POST' || isWebSocketUpgrade) {
+        return this.handleCapnWeb(request)
+      }
+      // GET falls through to handleSite
+    }
+
+    // Legacy JSON-RPC at /rpc and REST at /api/*
     if (path === '/rpc' || path.startsWith('/api/')) {
       return this.handleRPC(request, path)
     }
@@ -161,7 +201,110 @@ export class DO {
   }
 
   // ===========================================================================
-  // RPC Handling
+  // CapnWeb Protocol Handling (Primary RPC Transport)
+  // ===========================================================================
+
+  /**
+   * Handle CapnWeb RPC requests on root `/` path
+   *
+   * CapnWeb is the primary RPC transport for rpc.do clients. It provides:
+   * - Promise pipelining for batched operations
+   * - Capability-based security via RpcTarget pattern
+   * - 95% cost savings via WebSocket hibernation
+   *
+   * The localMain object wraps all DO API methods and is navigable by clients.
+   */
+  private async handleCapnWeb(request: Request): Promise<Response> {
+    const { definition, $ } = this.ensureLoaded()
+
+    // Create localMain object that exposes all API methods
+    const localMain = this.createCapnWebTarget(definition, $)
+
+    // Import capnweb module (lazy loaded)
+    const capnweb = await getCapnwebModule()
+
+    // Handle WebSocket upgrade
+    if (request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
+      if (capnweb.newWorkersWebSocketRpcResponse) {
+        return capnweb.newWorkersWebSocketRpcResponse(request, localMain)
+      }
+      return new Response('WebSocket RPC not available', { status: 501 })
+    }
+
+    // Handle HTTP batch
+    if (capnweb.newHttpBatchRpcResponse) {
+      return capnweb.newHttpBatchRpcResponse(request, localMain)
+    }
+
+    // Fallback to JSON error if capnweb not available
+    return Response.json({ error: 'CapnWeb protocol not available' }, { status: 501 })
+  }
+
+  /**
+   * Create a CapnWeb-compatible target object that wraps the DO's API
+   *
+   * This object is passed as `localMain` to capnweb server functions.
+   * The client navigates this object tree via the capnweb proxy.
+   *
+   * @example Client usage:
+   * const $ = RPC('https://objects.do/my.do')
+   * await $.ping() // calls definition.api.ping
+   * await $.users.list() // calls definition.api.users.list
+   */
+  private createCapnWebTarget(definition: DODefinition, $: DOContext): Record<string, unknown> {
+    const self = this
+
+    // Build target object from API definition
+    const buildTarget = (api: Record<string, unknown> | undefined, prefix = ''): Record<string, unknown> => {
+      if (!api) return {}
+
+      const target: Record<string, unknown> = {}
+
+      for (const [key, value] of Object.entries(api)) {
+        const path = prefix ? `${prefix}.${key}` : key
+
+        if (typeof value === 'string') {
+          // Direct code string - wrap as callable
+          target[key] = createCallable(value, path)
+        } else if (typeof value === 'object' && value !== null) {
+          if ('code' in value && typeof (value as { code: unknown }).code === 'string') {
+            // APIMethodDefinition with code and params
+            const def = value as { code: string; params?: string[] }
+            target[key] = createCallable(def.code, path, def.params)
+          } else {
+            // Nested namespace - recurse
+            target[key] = buildTarget(value as Record<string, unknown>, path)
+          }
+        }
+      }
+
+      return target
+    }
+
+    // Create a callable function that executes method code
+    const createCallable = (code: string, path: string, methodParams?: string[]) => {
+      return async (...args: unknown[]): Promise<unknown> => {
+        // Validate code for security
+        const validation = validateFunctionCode(code)
+        if (!validation.valid) {
+          throw new Error(validation.reason || 'Security error')
+        }
+
+        // Execute function
+        const result = await executeFunction(code, $, args, { methodParams }, { LOADER: self.env.LOADER })
+        if (!result.success) {
+          throw new Error(result.error?.message || 'Execution failed')
+        }
+
+        return result.result
+      }
+    }
+
+    return buildTarget(definition.api)
+  }
+
+  // ===========================================================================
+  // RPC Handling (Legacy JSON-RPC)
   // ===========================================================================
 
   /**

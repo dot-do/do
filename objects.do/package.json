@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@dotdo/capnweb": "^0.4.0",
     "ai-evaluate": "^2.2.0",
     "rpc.do": "^0.2.3",
     "zod": "^3.23.0"

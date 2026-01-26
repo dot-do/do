@@ -142,6 +142,22 @@ function createTestDefinition(overrides: Partial<DODefinition> = {}): DODefiniti
   }
 }
 
+/**
+ * Creates a request with X-DO-Name header
+ *
+ * The DO class requires X-DO-Name header to know which definition to load.
+ * This header is normally set by the worker that routes requests to the DO.
+ */
+function createRequest(
+  url: string,
+  options?: RequestInit & { doName?: string }
+): Request {
+  const { doName = 'test.app.do', ...init } = options || {}
+  const headers = new Headers(init?.headers)
+  headers.set('X-DO-Name', doName)
+  return new Request(url, { ...init, headers })
+}
+
 // =============================================================================
 // 1. Definition Loading Tests
 // =============================================================================
@@ -160,11 +176,14 @@ describe('DO definition loading', () => {
   it('should load DO definition from registry by ID', async () => {
     // Setup: Put a definition in the registry
     const definition = createTestDefinition()
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
+
+    // Verify the helper sets the header correctly
+    const request = createRequest('https://test.app.do/__schema')
+    expect(request.headers.get('X-DO-Name')).toBe('test.app.do')
 
     // Create DO and make a request to trigger definition loading
     const genericDO = new DO(state, env)
-    const request = new Request('https://test.app.do/__schema')
     const response = await genericDO.fetch(request)
 
     // Verify definition was loaded
@@ -175,14 +194,14 @@ describe('DO definition loading', () => {
   it('should cache definition after first load', async () => {
     // Setup: Put a definition in the registry
     const definition = createTestDefinition()
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
 
     const genericDO = new DO(state, env)
 
     // Make multiple requests
-    await genericDO.fetch(new Request('https://test.app.do/__schema'))
-    await genericDO.fetch(new Request('https://test.app.do/__schema'))
-    await genericDO.fetch(new Request('https://test.app.do/__schema'))
+    await genericDO.fetch(createRequest('https://test.app.do/__schema'))
+    await genericDO.fetch(createRequest('https://test.app.do/__schema'))
+    await genericDO.fetch(createRequest('https://test.app.do/__schema'))
 
     // Registry should only be called once (definition is cached)
     expect(registry.get).toHaveBeenCalledTimes(1)
@@ -191,7 +210,7 @@ describe('DO definition loading', () => {
   it('should handle missing definition gracefully', async () => {
     // No definition in registry
     const genericDO = new DO(state, env)
-    const request = new Request('https://test.app.do/rpc', {
+    const request = createRequest('https://test.app.do/rpc', {
       method: 'POST',
       body: JSON.stringify({ method: 'ping', params: [] }),
     })
@@ -206,10 +225,10 @@ describe('DO definition loading', () => {
   it('should validate definition schema', async () => {
     // Put an invalid definition (missing required fields)
     const invalidDefinition = { invalid: true } // Missing $id
-    await registry.put('test.app.do', JSON.stringify(invalidDefinition))
+    await registry.put('test.app.do', JSON.stringify({ definition: invalidDefinition }))
 
     const genericDO = new DO(state, env)
-    const request = new Request('https://test.app.do/__schema')
+    const request = createRequest('https://test.app.do/__schema')
     const response = await genericDO.fetch(request)
 
     expect(response.status).toBe(400)
@@ -219,10 +238,10 @@ describe('DO definition loading', () => {
 
   it('should load definition with $version', async () => {
     const definition = createTestDefinition({ $version: '1.0.0' })
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
 
     const genericDO = new DO(state, env)
-    const request = new Request('https://test.app.do/__schema')
+    const request = createRequest('https://test.app.do/__schema')
     const response = await genericDO.fetch(request)
 
     const schema = await response.json() as JsonResponse
@@ -237,12 +256,12 @@ describe('DO definition loading', () => {
       api: { ...createTestDefinition().api, newMethod: 'async () => "v2"' },
     })
 
-    await registry.put('test.app.do@v1.0.0', JSON.stringify(v1))
-    await registry.put('test.app.do@v2.0.0', JSON.stringify(v2))
+    await registry.put('test.app.do@v1.0.0', JSON.stringify({ definition: v1 }))
+    await registry.put('test.app.do@v2.0.0', JSON.stringify({ definition: v2 }))
 
     const stateV1 = createMockState('test.app.do@v1.0.0')
     const genericDO = new DO(stateV1, env)
-    const request = new Request('https://test.app.do/__schema')
+    const request = createRequest('https://test.app.do/__schema')
     const response = await genericDO.fetch(request)
 
     const schema = await response.json() as JsonResponse
@@ -285,12 +304,12 @@ describe('DO RPC', () => {
         throwError: 'async () => { throw new Error("intentional error") }',
       },
     })
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
   })
 
   it('should execute simple API methods', async () => {
     const genericDO = new DO(state, env)
-    const request = new Request('https://test.app.do/rpc', {
+    const request = createRequest('https://test.app.do/rpc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ method: 'ping', params: [] }),
@@ -308,7 +327,7 @@ describe('DO RPC', () => {
 
     // Test echo method
     const echoResponse = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'echo', params: ['hello world'] }),
@@ -321,7 +340,7 @@ describe('DO RPC', () => {
 
     // Test add method with multiple parameters
     const addResponse = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'add', params: [5, 3] }),
@@ -338,7 +357,7 @@ describe('DO RPC', () => {
 
     // Test nested method: users.list
     const listResponse = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'users.list', params: [] }),
@@ -351,7 +370,7 @@ describe('DO RPC', () => {
 
     // Test nested method: users.get with parameter
     const getResponse = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'users.get', params: ['user-1'] }),
@@ -367,7 +386,7 @@ describe('DO RPC', () => {
     const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'billing.plans.get', params: ['pro'] }),
@@ -382,7 +401,7 @@ describe('DO RPC', () => {
   it('should return proper JSON-RPC responses', async () => {
     const genericDO = new DO(state, env)
 
-    const request = new Request('https://test.app.do/rpc', {
+    const request = createRequest('https://test.app.do/rpc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping', params: [] }),
@@ -402,7 +421,7 @@ describe('DO RPC', () => {
     const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'nonExistent', params: [] }),
@@ -420,7 +439,7 @@ describe('DO RPC', () => {
     const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'throwError', params: [] }),
@@ -440,7 +459,7 @@ describe('DO RPC', () => {
     const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: 'not valid json',
@@ -456,14 +475,14 @@ describe('DO RPC', () => {
     const genericDO = new DO(state, env)
 
     // GET /api/users should call users.list
-    const listResponse = await genericDO.fetch(new Request('https://test.app.do/api/users', { method: 'GET' }))
+    const listResponse = await genericDO.fetch(createRequest('https://test.app.do/api/users', { method: 'GET' }))
 
     expect(listResponse.status).toBe(200)
     const listBody = await listResponse.json() as JsonResponse
     expect(listBody).toEqual(['alice', 'bob'])
 
     // GET /api/users/123 should call users.get
-    const getResponse = await genericDO.fetch(new Request('https://test.app.do/api/users/123', { method: 'GET' }))
+    const getResponse = await genericDO.fetch(createRequest('https://test.app.do/api/users/123', { method: 'GET' }))
 
     expect(getResponse.status).toBe(200)
     const getBody = await getResponse.json() as JsonResponse
@@ -474,7 +493,7 @@ describe('DO RPC', () => {
     const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify([
@@ -519,11 +538,11 @@ describe('DO function execution', () => {
         }`,
       },
     })
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
 
     const genericDO = new DO(state, env)
     const response = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'asyncTest', params: [] }),
@@ -541,12 +560,12 @@ describe('DO function execution', () => {
         getType: 'async () => $.$type',
       },
     })
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
 
     const genericDO = new DO(state, env)
 
     const idResponse = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'getId', params: [] }),
@@ -557,7 +576,7 @@ describe('DO function execution', () => {
     expect(idBody.result).toBe('test.app.do')
 
     const typeResponse = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'getType', params: [] }),
@@ -575,13 +594,13 @@ describe('DO function execution', () => {
         getData: 'async (key) => $.db.get(key)',
       },
     })
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
 
     const genericDO = new DO(state, env)
 
     // Save data
     const saveResponse = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'saveData', params: ['myKey', { foo: 'bar' }] }),
@@ -592,7 +611,7 @@ describe('DO function execution', () => {
 
     // Get data
     const getResponse = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'getData', params: ['myKey'] }),
@@ -609,12 +628,12 @@ describe('DO function execution', () => {
         generate: 'async (prompt) => $.ai.generate(prompt)',
       },
     })
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
 
     const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'generate', params: ['Hello AI'] }),
@@ -641,7 +660,7 @@ describe('DO function execution', () => {
         accessFunction: 'async () => new Function("return 1")()',
       },
     })
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
 
     const genericDO = new DO(state, env)
 
@@ -650,7 +669,7 @@ describe('DO function execution', () => {
 
     for (const method of dangerousMethods) {
       const response = await genericDO.fetch(
-        new Request('https://test.app.do/rpc', {
+        createRequest('https://test.app.do/rpc', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ method, params: [] }),
@@ -670,13 +689,13 @@ describe('DO function execution', () => {
         readFile: 'async (path) => $.fsx.read(path)',
       },
     })
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
 
     const genericDO = new DO(state, env)
 
     // Write file
     const writeResponse = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'writeFile', params: ['/data/test.txt', 'hello world'] }),
@@ -687,7 +706,7 @@ describe('DO function execution', () => {
 
     // Read file
     const readResponse = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'readFile', params: ['/data/test.txt'] }),
@@ -707,12 +726,12 @@ describe('DO function execution', () => {
         }`,
       },
     })
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
 
     const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'createUser', params: [{ name: 'Alice' }] }),
@@ -735,12 +754,12 @@ describe('DO function execution', () => {
         getApiKey: 'async () => $.config.apiKey',
       },
     })
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
 
     const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'getApiKey', params: [] }),
@@ -779,12 +798,12 @@ describe('DO site serving', () => {
         '/settings': '<Settings config={$.config} />',
       },
     })
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
   })
 
   it('should serve site content for /', async () => {
     const genericDO = new DO(state, env)
-    const response = await genericDO.fetch(new Request('https://test.app.do/'))
+    const response = await genericDO.fetch(createRequest('https://test.app.do/'))
 
     expect(response.status).toBe(200)
     expect(response.headers.get('content-type')).toMatch(/text\/html|text\/plain/)
@@ -798,13 +817,13 @@ describe('DO site serving', () => {
     const genericDO = new DO(state, env)
 
     // Test /about
-    const aboutResponse = await genericDO.fetch(new Request('https://test.app.do/about'))
+    const aboutResponse = await genericDO.fetch(createRequest('https://test.app.do/about'))
     expect(aboutResponse.status).toBe(200)
     const aboutBody = await aboutResponse.text()
     expect(aboutBody).toContain('About Us')
 
     // Test /pricing
-    const pricingResponse = await genericDO.fetch(new Request('https://test.app.do/pricing'))
+    const pricingResponse = await genericDO.fetch(createRequest('https://test.app.do/pricing'))
     expect(pricingResponse.status).toBe(200)
     const pricingBody = await pricingResponse.text()
     expect(pricingBody).toContain('Pricing')
@@ -813,7 +832,7 @@ describe('DO site serving', () => {
   it('should serve nested site pages', async () => {
     const genericDO = new DO(state, env)
 
-    const response = await genericDO.fetch(new Request('https://test.app.do/docs/getting-started'))
+    const response = await genericDO.fetch(createRequest('https://test.app.do/docs/getting-started'))
 
     expect(response.status).toBe(200)
     const body = await response.text()
@@ -823,7 +842,7 @@ describe('DO site serving', () => {
   it('should serve app pages for /app/dashboard', async () => {
     const genericDO = new DO(state, env)
 
-    const response = await genericDO.fetch(new Request('https://test.app.do/app/dashboard'))
+    const response = await genericDO.fetch(createRequest('https://test.app.do/app/dashboard'))
 
     expect(response.status).toBe(200)
     const body = await response.text()
@@ -834,13 +853,13 @@ describe('DO site serving', () => {
     const genericDO = new DO(state, env)
 
     // Test /app/customers
-    const customersResponse = await genericDO.fetch(new Request('https://test.app.do/app/customers'))
+    const customersResponse = await genericDO.fetch(createRequest('https://test.app.do/app/customers'))
     expect(customersResponse.status).toBe(200)
     const customersBody = await customersResponse.text()
     expect(customersBody).toContain('CustomerList')
 
     // Test /app/settings
-    const settingsResponse = await genericDO.fetch(new Request('https://test.app.do/app/settings'))
+    const settingsResponse = await genericDO.fetch(createRequest('https://test.app.do/app/settings'))
     expect(settingsResponse.status).toBe(200)
     const settingsBody = await settingsResponse.text()
     expect(settingsBody).toContain('Settings')
@@ -849,7 +868,7 @@ describe('DO site serving', () => {
   it('should return 404 for missing pages', async () => {
     const genericDO = new DO(state, env)
 
-    const response = await genericDO.fetch(new Request('https://test.app.do/nonexistent'))
+    const response = await genericDO.fetch(createRequest('https://test.app.do/nonexistent'))
 
     expect(response.status).toBe(404)
     const body = await response.json() as JsonResponse
@@ -859,7 +878,7 @@ describe('DO site serving', () => {
   it('should return 404 for missing app pages', async () => {
     const genericDO = new DO(state, env)
 
-    const response = await genericDO.fetch(new Request('https://test.app.do/app/nonexistent'))
+    const response = await genericDO.fetch(createRequest('https://test.app.do/app/nonexistent'))
 
     expect(response.status).toBe(404)
   })
@@ -869,7 +888,7 @@ describe('DO site serving', () => {
     const definition = createTestDefinition({
       site: '# Simple Site\n\nJust one page.',
     })
-    await registry.put('simple.app.do', JSON.stringify(definition))
+    await registry.put('simple.app.do', JSON.stringify({ definition }))
 
     const simpleState = createMockState('simple.app.do')
     const genericDO = new DO(simpleState, env)
@@ -887,7 +906,7 @@ describe('DO site serving', () => {
       site: { '/': '# Home' },
     })
     delete (definition as unknown as Record<string, unknown>).app
-    await registry.put('no-app.do', JSON.stringify(definition))
+    await registry.put('no-app.do', JSON.stringify({ definition }))
 
     const noAppState = createMockState('no-app.do')
     const genericDO = new DO(noAppState, env)
@@ -920,10 +939,10 @@ describe('DO schema', () => {
         echo: 'async (msg) => msg',
       },
     })
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
 
     const genericDO = new DO(state, env)
-    const response = await genericDO.fetch(new Request('https://test.app.do/__schema'))
+    const response = await genericDO.fetch(createRequest('https://test.app.do/__schema'))
 
     expect(response.status).toBe(200)
     const schema = await response.json() as JsonResponse
@@ -941,10 +960,10 @@ describe('DO schema', () => {
         add: 'async (a, b) => a + b',
       },
     })
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
 
     const genericDO = new DO(state, env)
-    const response = await genericDO.fetch(new Request('https://test.app.do/__schema'))
+    const response = await genericDO.fetch(createRequest('https://test.app.do/__schema'))
 
     const schema = await response.json() as JsonResponse
 
@@ -970,10 +989,10 @@ describe('DO schema', () => {
         },
       },
     })
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
 
     const genericDO = new DO(state, env)
-    const response = await genericDO.fetch(new Request('https://test.app.do/__schema'))
+    const response = await genericDO.fetch(createRequest('https://test.app.do/__schema'))
 
     const schema = await response.json() as JsonResponse
 
@@ -996,10 +1015,10 @@ describe('DO schema', () => {
         },
       },
     })
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
 
     const genericDO = new DO(state, env)
-    const response = await genericDO.fetch(new Request('https://test.app.do/__schema'))
+    const response = await genericDO.fetch(createRequest('https://test.app.do/__schema'))
 
     const schema = await response.json() as JsonResponse
 
@@ -1020,10 +1039,10 @@ describe('DO schema', () => {
         '/settings': '<Settings />',
       },
     })
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
 
     const genericDO = new DO(state, env)
-    const response = await genericDO.fetch(new Request('https://test.app.do/__schema'))
+    const response = await genericDO.fetch(createRequest('https://test.app.do/__schema'))
 
     const schema = await response.json() as JsonResponse
 
@@ -1047,10 +1066,10 @@ describe('DO schema', () => {
         'every.day.at9am': 'async () => {}',
       },
     })
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
 
     const genericDO = new DO(state, env)
-    const response = await genericDO.fetch(new Request('https://test.app.do/__schema'))
+    const response = await genericDO.fetch(createRequest('https://test.app.do/__schema'))
 
     const schema = await response.json() as JsonResponse
 
@@ -1065,10 +1084,10 @@ describe('DO schema', () => {
 
   it('should return schema with proper content-type', async () => {
     const definition = createTestDefinition()
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
 
     const genericDO = new DO(state, env)
-    const response = await genericDO.fetch(new Request('https://test.app.do/__schema'))
+    const response = await genericDO.fetch(createRequest('https://test.app.do/__schema'))
 
     expect(response.headers.get('content-type')).toMatch(/application\/json/)
   })
@@ -1101,13 +1120,13 @@ describe('DO event handling', () => {
         getLastUser: 'async () => $.db.get("lastUser")',
       },
     })
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
 
     const genericDO = new DO(state, env)
 
     // Send an event
     const eventResponse = await genericDO.fetch(
-      new Request('https://test.app.do/__event', {
+      createRequest('https://test.app.do/__event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1121,7 +1140,7 @@ describe('DO event handling', () => {
 
     // Verify the event was handled
     const getResponse = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'getLastUser', params: [] }),
@@ -1138,13 +1157,13 @@ describe('DO event handling', () => {
         'User.created': 'async (user) => {}',
       },
     })
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
 
     const genericDO = new DO(state, env)
 
     // Send an unhandled event
     const response = await genericDO.fetch(
-      new Request('https://test.app.do/__event', {
+      createRequest('https://test.app.do/__event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1184,12 +1203,12 @@ describe('DO MCP', () => {
         },
       },
     })
-    await registry.put('test.app.do', JSON.stringify(definition))
+    await registry.put('test.app.do', JSON.stringify({ definition }))
   })
 
   it('should expose /mcp endpoint', async () => {
     const genericDO = new DO(state, env)
-    const response = await genericDO.fetch(new Request('https://test.app.do/mcp'))
+    const response = await genericDO.fetch(createRequest('https://test.app.do/mcp'))
 
     expect(response.status).toBe(200)
   })
@@ -1197,7 +1216,7 @@ describe('DO MCP', () => {
   it('should return MCP-compatible tool definitions', async () => {
     const genericDO = new DO(state, env)
     const response = await genericDO.fetch(
-      new Request('https://test.app.do/mcp', {
+      createRequest('https://test.app.do/mcp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'tools/list', params: {} }),
@@ -1218,7 +1237,7 @@ describe('DO MCP', () => {
   it('should handle MCP tool calls', async () => {
     const genericDO = new DO(state, env)
     const response = await genericDO.fetch(
-      new Request('https://test.app.do/mcp', {
+      createRequest('https://test.app.do/mcp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1335,7 +1354,7 @@ describe('DO definition updates', () => {
     }
 
     const response = await genericDO.fetch(
-      new Request('https://test.app.do/', {
+      createRequest('https://test.app.do/', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1356,7 +1375,7 @@ describe('DO definition updates', () => {
     const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(
-      new Request('https://test.app.do/', {
+      createRequest('https://test.app.do/', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ $id: 'test.app.do', api: {} }),
@@ -1371,13 +1390,13 @@ describe('DO definition updates', () => {
     const initialDef = createTestDefinition({
       api: { version: 'async () => "v1"' },
     })
-    await registry.put('test.app.do', JSON.stringify(initialDef))
+    await registry.put('test.app.do', JSON.stringify({ definition: initialDef }))
 
     const genericDO = new DO(state, env)
 
     // First call loads and caches v1
     const v1Response = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'version', params: [] }),
@@ -1391,7 +1410,7 @@ describe('DO definition updates', () => {
     })
 
     await genericDO.fetch(
-      new Request('https://test.app.do/', {
+      createRequest('https://test.app.do/', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1403,7 +1422,7 @@ describe('DO definition updates', () => {
 
     // Subsequent call should use v2
     const v2Response = await genericDO.fetch(
-      new Request('https://test.app.do/rpc', {
+      createRequest('https://test.app.do/rpc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'version', params: [] }),

@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@dotdo/capnweb':
+        specifier: ^0.4.0
+        version: 0.4.0
       ai-evaluate:
         specifier: ^2.2.0
         version: 2.2.0
@@ -125,6 +128,14 @@ packages:
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
     engines: {node: '>=12'}
+
+  '@dotdo/capnweb@0.4.0':
+    resolution: {integrity: sha512-0EF06g63tc7i5x9y95ObQ1wjG22lCISx2IyGQqsxb1jKysYcYLmgsY9lFuXXO1hzI4UXw8K86At4fFZ5wXZdDQ==}
+    peerDependencies:
+      '@dotdo/types': '>=0.1.0'
+    peerDependenciesMeta:
+      '@dotdo/types':
+        optional: true
 
   '@emnapi/runtime@1.8.1':
     resolution: {integrity: sha512-mehfKSMWjjNol8659Z8KxEMrdSJDDot5SXMq00dM8BN4o+CLNXQ0xH2V7EchNHV4RmbZLmmPdEaXZc5H2FXmDg==}
@@ -1433,6 +1444,8 @@ snapshots:
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.9
+
+  '@dotdo/capnweb@0.4.0': {}
 
   '@emnapi/runtime@1.8.1':
     dependencies:
