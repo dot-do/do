@@ -24,7 +24,8 @@
     { "binding": "AI", "service": "ai-do" },
     { "binding": "AUTH", "service": "auth-do" },
     { "binding": "OAUTH", "service": "oauth-do" },
-    { "binding": "MCP", "service": "mcp-do" }
+    { "binding": "MCP", "service": "mcp-do" },
+    { "binding": "MDX", "service": "mdx-do" }
   ],
 
   // SQLite for DO storage

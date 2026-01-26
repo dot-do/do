@@ -121,6 +121,7 @@ export interface Env {
   STRIPE: Fetcher
   GITHUB: Fetcher
   AI: Fetcher
+  MDX: Fetcher
 }
 
 interface DurableObjectNamespace {
@@ -186,6 +187,9 @@ export default {
     if (path.startsWith('/ai/') || path === '/ai') {
       return routeToService(env.AI, request, '/ai')
     }
+    if (path.startsWith('/mdx/') || path === '/mdx') {
+      return routeToService(env.MDX, request, '/mdx')
+    }
 
     // Unified RPC endpoint - routes to any service
     if (path === '/rpc' && request.method === 'POST') {
@@ -201,7 +205,7 @@ export default {
     if (path === '/__schema') {
       return Response.json({
         version: 1,
-        services: ['auth', 'oauth', 'mcp', 'esbuild', 'stripe', 'github', 'ai'],
+        services: ['auth', 'oauth', 'mcp', 'esbuild', 'stripe', 'github', 'ai', 'mdx'],
         description: 'objects.do - Universal DO Runtime & Service Hub',
         usage: {
           do: 'Service binding name for RPC execution',
@@ -220,7 +224,7 @@ export default {
           do: 'Universal RPC execution (services + DOs)',
           DO: 'Digital/Durable Object class'
         },
-        services: ['auth', 'oauth', 'mcp', 'esbuild', 'stripe', 'github', 'ai'],
+        services: ['auth', 'oauth', 'mcp', 'esbuild', 'stripe', 'github', 'ai', 'mdx'],
         usage: {
           services: 'GET /auth, /oauth, /stripe, /github, /ai, /esbuild, /mcp',
           rpc: 'POST /rpc { method: "service.method", params: [...] }',
@@ -300,6 +304,7 @@ function getService(name: string, env: Env): Fetcher | null {
     stripe: env.STRIPE,
     github: env.GITHUB,
     ai: env.AI,
+    mdx: env.MDX,
   }
   return services[name.toLowerCase()] || null
 }
