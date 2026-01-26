@@ -291,11 +291,12 @@ describe('do logs <id>', () => {
     await new Promise((resolve) => setTimeout(resolve, 100))
     abort()
 
-    if (receivedEntry) {
-      expect(receivedEntry).toHaveProperty('timestamp')
-      expect(receivedEntry).toHaveProperty('level')
-      expect(receivedEntry).toHaveProperty('message')
-      expect(['debug', 'info', 'warn', 'error']).toContain(receivedEntry.level)
+    if (receivedEntry !== null) {
+      const entry = receivedEntry as LogEntry
+      expect(entry).toHaveProperty('timestamp')
+      expect(entry).toHaveProperty('level')
+      expect(entry).toHaveProperty('message')
+      expect(['debug', 'info', 'warn', 'error']).toContain(entry.level)
     }
   })
 

@@ -145,11 +145,20 @@ export interface DOProxy {
 }
 
 /**
- * RPC proxy that allows arbitrary nested method calls
+ * RPC proxy that allows arbitrary nested method calls.
+ * Each property is both callable (returns Promise) and chainable (returns RPCProxy).
  */
-export interface RPCProxy {
-  [key: string]: RPCProxy | ((...args: unknown[]) => Promise<unknown>)
+export type RPCProxy = {
+  [key: string]: RPCProxyMethod
 }
+
+/**
+ * RPC proxy method - both callable and chainable.
+ * This is an intersection type that allows:
+ * - proxy.method() - call as function
+ * - proxy.namespace.method() - chain for nested access
+ */
+export type RPCProxyMethod = ((...args: unknown[]) => Promise<unknown>) & RPCProxy
 
 // =============================================================================
 // In-memory storage for testing (simulates server-side storage)

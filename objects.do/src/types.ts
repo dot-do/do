@@ -1281,20 +1281,26 @@ export interface Env {
  * R2 bucket interface (subset)
  */
 export interface R2Bucket {
-  get(key: string): Promise<R2Object | null>
-  put(key: string, value: string | ArrayBuffer | ReadableStream): Promise<R2Object>
+  get(key: string): Promise<R2ObjectBody | null>
+  put(key: string, value: string | ArrayBuffer | ReadableStream): Promise<R2Object | null>
   delete(key: string): Promise<void>
   list(options?: R2ListOptions): Promise<R2Objects>
 }
 
 /**
- * R2 object
+ * R2 object (metadata only, returned by put())
  */
 export interface R2Object {
   key: string
   size: number
   etag: string
   uploaded: Date
+}
+
+/**
+ * R2 object with body (returned by get())
+ */
+export interface R2ObjectBody extends R2Object {
   body: ReadableStream
   text(): Promise<string>
   json<T = unknown>(): Promise<T>

@@ -62,6 +62,7 @@ export type {
   StripePaymentIntent,
   R2Bucket,
   R2Object,
+  R2ObjectBody,
   R2ListOptions,
   R2Objects,
   DurableObjectNamespace,
@@ -170,14 +171,20 @@ interface DurableObjectStub {
 }
 
 interface R2Bucket {
-  get(key: string): Promise<R2Object | null>
-  put(key: string, value: string | ArrayBuffer | ReadableStream): Promise<R2Object>
+  get(key: string): Promise<R2ObjectBody | null>
+  put(key: string, value: string | ArrayBuffer | ReadableStream): Promise<R2Object | null>
   delete(key: string): Promise<void>
   list(options?: { prefix?: string; limit?: number; cursor?: string }): Promise<{ objects: R2Object[]; truncated: boolean; cursor?: string }>
 }
 
 interface R2Object {
   key: string
+  size: number
+  etag: string
+  uploaded: Date
+}
+
+interface R2ObjectBody extends R2Object {
   body: ReadableStream
   text(): Promise<string>
   json<T = unknown>(): Promise<T>
