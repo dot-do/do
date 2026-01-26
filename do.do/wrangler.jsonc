@@ -1,0 +1,34 @@
+{
+  "name": "do",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-12-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // The hub has bindings to ALL service workers
+  "services": [
+    // Core services
+    { "binding": "AUTH", "service": "auth-do" },
+    { "binding": "OAUTH", "service": "oauth-do" },
+    { "binding": "MCP", "service": "mcp-do" },
+    
+    // Build tools
+    { "binding": "ESBUILD", "service": "esbuild-do" },
+    
+    // Integrations
+    { "binding": "STRIPE", "service": "stripe-do" },
+    { "binding": "GITHUB", "service": "github-do" },
+    
+    // AI
+    { "binding": "AI", "service": "ai-do" },
+    
+    // The DO runtime itself
+    { "binding": "OBJECTS", "service": "objects-do" }
+  ],
+
+  // The hub also has a DO for caching/state
+  "durable_objects": {
+    "bindings": [
+      { "name": "HUB", "class_name": "HubDO" }
+    ]
+  }
+}

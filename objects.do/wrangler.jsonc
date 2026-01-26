@@ -1,0 +1,30 @@
+{
+  "name": "objects-do",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-12-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // The universal DO runtime
+  "durable_objects": {
+    "bindings": [
+      { "name": "OBJECTS", "class_name": "GenericDO" }
+    ]
+  },
+
+  // DO definition registry
+  "r2_buckets": [
+    { "binding": "REGISTRY", "bucket_name": "do-registry" }
+  ],
+
+  // Service bindings to heavy-dep workers
+  "services": [
+    { "binding": "ESBUILD", "service": "esbuild-do" },
+    { "binding": "STRIPE", "service": "stripe-do" },
+    { "binding": "AI", "service": "ai-do" }
+  ],
+
+  // SQLite for GenericDO storage
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["GenericDO"] }
+  ]
+}
