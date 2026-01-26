@@ -1,10 +1,10 @@
 /**
- * Tests for GenericDO - Universal DO Runtime
+ * Tests for DO - Universal DO Runtime
  *
- * These tests define the expected behavior of the GenericDO class,
+ * These tests define the expected behavior of the DO class,
  * which is the universal runtime that interprets DO definitions as data.
  *
- * GenericDO enables "every DO is data" - no deployment needed.
+ * DO enables "every DO is data" - no deployment needed.
  *
  * @module tests/generic-do
  */
@@ -14,7 +14,7 @@ import type { DurableObjectState, R2Bucket } from '@cloudflare/workers-types'
 
 // Import types from the types module
 import { createContext } from '../src/context'
-import { GenericDO } from '../src/GenericDO'
+import { DO } from '../src/DO'
 import type { DODefinition, DOContext, Env } from '../src/types'
 
 // Helper type for JSON responses
@@ -146,7 +146,7 @@ function createTestDefinition(overrides: Partial<DODefinition> = {}): DODefiniti
 // 1. Definition Loading Tests
 // =============================================================================
 
-describe('GenericDO definition loading', () => {
+describe('DO definition loading', () => {
   let registry: R2Bucket
   let state: DurableObjectState
   let env: ReturnType<typeof createMockEnv>
@@ -162,8 +162,8 @@ describe('GenericDO definition loading', () => {
     const definition = createTestDefinition()
     await registry.put('test.app.do', JSON.stringify(definition))
 
-    // Create GenericDO and make a request to trigger definition loading
-    const genericDO = new GenericDO(state, env)
+    // Create DO and make a request to trigger definition loading
+    const genericDO = new DO(state, env)
     const request = new Request('https://test.app.do/__schema')
     const response = await genericDO.fetch(request)
 
@@ -177,7 +177,7 @@ describe('GenericDO definition loading', () => {
     const definition = createTestDefinition()
     await registry.put('test.app.do', JSON.stringify(definition))
 
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     // Make multiple requests
     await genericDO.fetch(new Request('https://test.app.do/__schema'))
@@ -190,7 +190,7 @@ describe('GenericDO definition loading', () => {
 
   it('should handle missing definition gracefully', async () => {
     // No definition in registry
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
     const request = new Request('https://test.app.do/rpc', {
       method: 'POST',
       body: JSON.stringify({ method: 'ping', params: [] }),
@@ -208,7 +208,7 @@ describe('GenericDO definition loading', () => {
     const invalidDefinition = { invalid: true } // Missing $id
     await registry.put('test.app.do', JSON.stringify(invalidDefinition))
 
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
     const request = new Request('https://test.app.do/__schema')
     const response = await genericDO.fetch(request)
 
@@ -221,7 +221,7 @@ describe('GenericDO definition loading', () => {
     const definition = createTestDefinition({ $version: '1.0.0' })
     await registry.put('test.app.do', JSON.stringify(definition))
 
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
     const request = new Request('https://test.app.do/__schema')
     const response = await genericDO.fetch(request)
 
@@ -241,7 +241,7 @@ describe('GenericDO definition loading', () => {
     await registry.put('test.app.do@v2.0.0', JSON.stringify(v2))
 
     const stateV1 = createMockState('test.app.do@v1.0.0')
-    const genericDO = new GenericDO(stateV1, env)
+    const genericDO = new DO(stateV1, env)
     const request = new Request('https://test.app.do/__schema')
     const response = await genericDO.fetch(request)
 
@@ -254,7 +254,7 @@ describe('GenericDO definition loading', () => {
 // 2. RPC Handling Tests
 // =============================================================================
 
-describe('GenericDO RPC', () => {
+describe('DO RPC', () => {
   let registry: R2Bucket
   let state: DurableObjectState
   let env: ReturnType<typeof createMockEnv>
@@ -289,7 +289,7 @@ describe('GenericDO RPC', () => {
   })
 
   it('should execute simple API methods', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
     const request = new Request('https://test.app.do/rpc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -304,7 +304,7 @@ describe('GenericDO RPC', () => {
   })
 
   it('should execute methods with parameters', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     // Test echo method
     const echoResponse = await genericDO.fetch(
@@ -334,7 +334,7 @@ describe('GenericDO RPC', () => {
   })
 
   it('should handle nested namespaces (api.users.get)', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     // Test nested method: users.list
     const listResponse = await genericDO.fetch(
@@ -364,7 +364,7 @@ describe('GenericDO RPC', () => {
   })
 
   it('should handle deeply nested namespaces (api.billing.plans.get)', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(
       new Request('https://test.app.do/rpc', {
@@ -380,7 +380,7 @@ describe('GenericDO RPC', () => {
   })
 
   it('should return proper JSON-RPC responses', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     const request = new Request('https://test.app.do/rpc', {
       method: 'POST',
@@ -399,7 +399,7 @@ describe('GenericDO RPC', () => {
   })
 
   it('should handle method not found', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(
       new Request('https://test.app.do/rpc', {
@@ -417,7 +417,7 @@ describe('GenericDO RPC', () => {
   })
 
   it('should handle execution errors', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(
       new Request('https://test.app.do/rpc', {
@@ -437,7 +437,7 @@ describe('GenericDO RPC', () => {
   })
 
   it('should handle invalid JSON request', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(
       new Request('https://test.app.do/rpc', {
@@ -453,7 +453,7 @@ describe('GenericDO RPC', () => {
   })
 
   it('should handle REST-style API routes', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     // GET /api/users should call users.list
     const listResponse = await genericDO.fetch(new Request('https://test.app.do/api/users', { method: 'GET' }))
@@ -471,7 +471,7 @@ describe('GenericDO RPC', () => {
   })
 
   it('should support batch RPC requests', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(
       new Request('https://test.app.do/rpc', {
@@ -499,7 +499,7 @@ describe('GenericDO RPC', () => {
 // 3. Function Execution Tests
 // =============================================================================
 
-describe('GenericDO function execution', () => {
+describe('DO function execution', () => {
   let registry: R2Bucket
   let state: DurableObjectState
   let env: ReturnType<typeof createMockEnv>
@@ -521,7 +521,7 @@ describe('GenericDO function execution', () => {
     })
     await registry.put('test.app.do', JSON.stringify(definition))
 
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
     const response = await genericDO.fetch(
       new Request('https://test.app.do/rpc', {
         method: 'POST',
@@ -543,7 +543,7 @@ describe('GenericDO function execution', () => {
     })
     await registry.put('test.app.do', JSON.stringify(definition))
 
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     const idResponse = await genericDO.fetch(
       new Request('https://test.app.do/rpc', {
@@ -577,7 +577,7 @@ describe('GenericDO function execution', () => {
     })
     await registry.put('test.app.do', JSON.stringify(definition))
 
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     // Save data
     const saveResponse = await genericDO.fetch(
@@ -611,7 +611,7 @@ describe('GenericDO function execution', () => {
     })
     await registry.put('test.app.do', JSON.stringify(definition))
 
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(
       new Request('https://test.app.do/rpc', {
@@ -643,7 +643,7 @@ describe('GenericDO function execution', () => {
     })
     await registry.put('test.app.do', JSON.stringify(definition))
 
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     // All these should fail with security errors
     const dangerousMethods = ['accessProcess', 'accessRequire', 'accessGlobalThis', 'accessEval', 'accessFunction']
@@ -672,7 +672,7 @@ describe('GenericDO function execution', () => {
     })
     await registry.put('test.app.do', JSON.stringify(definition))
 
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     // Write file
     const writeResponse = await genericDO.fetch(
@@ -709,7 +709,7 @@ describe('GenericDO function execution', () => {
     })
     await registry.put('test.app.do', JSON.stringify(definition))
 
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(
       new Request('https://test.app.do/rpc', {
@@ -737,7 +737,7 @@ describe('GenericDO function execution', () => {
     })
     await registry.put('test.app.do', JSON.stringify(definition))
 
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(
       new Request('https://test.app.do/rpc', {
@@ -756,7 +756,7 @@ describe('GenericDO function execution', () => {
 // 4. Site/App Serving Tests
 // =============================================================================
 
-describe('GenericDO site serving', () => {
+describe('DO site serving', () => {
   let registry: R2Bucket
   let state: DurableObjectState
   let env: ReturnType<typeof createMockEnv>
@@ -783,7 +783,7 @@ describe('GenericDO site serving', () => {
   })
 
   it('should serve site content for /', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
     const response = await genericDO.fetch(new Request('https://test.app.do/'))
 
     expect(response.status).toBe(200)
@@ -795,7 +795,7 @@ describe('GenericDO site serving', () => {
   })
 
   it('should serve site pages for /about, /pricing', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     // Test /about
     const aboutResponse = await genericDO.fetch(new Request('https://test.app.do/about'))
@@ -811,7 +811,7 @@ describe('GenericDO site serving', () => {
   })
 
   it('should serve nested site pages', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(new Request('https://test.app.do/docs/getting-started'))
 
@@ -821,7 +821,7 @@ describe('GenericDO site serving', () => {
   })
 
   it('should serve app pages for /app/dashboard', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(new Request('https://test.app.do/app/dashboard'))
 
@@ -831,7 +831,7 @@ describe('GenericDO site serving', () => {
   })
 
   it('should serve other app pages', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     // Test /app/customers
     const customersResponse = await genericDO.fetch(new Request('https://test.app.do/app/customers'))
@@ -847,7 +847,7 @@ describe('GenericDO site serving', () => {
   })
 
   it('should return 404 for missing pages', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(new Request('https://test.app.do/nonexistent'))
 
@@ -857,7 +857,7 @@ describe('GenericDO site serving', () => {
   })
 
   it('should return 404 for missing app pages', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(new Request('https://test.app.do/app/nonexistent'))
 
@@ -872,7 +872,7 @@ describe('GenericDO site serving', () => {
     await registry.put('simple.app.do', JSON.stringify(definition))
 
     const simpleState = createMockState('simple.app.do')
-    const genericDO = new GenericDO(simpleState, env)
+    const genericDO = new DO(simpleState, env)
 
     const response = await genericDO.fetch(new Request('https://simple.app.do/'))
 
@@ -890,7 +890,7 @@ describe('GenericDO site serving', () => {
     await registry.put('no-app.do', JSON.stringify(definition))
 
     const noAppState = createMockState('no-app.do')
-    const genericDO = new GenericDO(noAppState, env)
+    const genericDO = new DO(noAppState, env)
 
     const response = await genericDO.fetch(new Request('https://no-app.do/app/anything'))
 
@@ -902,7 +902,7 @@ describe('GenericDO site serving', () => {
 // 5. Schema Generation Tests
 // =============================================================================
 
-describe('GenericDO schema', () => {
+describe('DO schema', () => {
   let registry: R2Bucket
   let state: DurableObjectState
   let env: ReturnType<typeof createMockEnv>
@@ -922,7 +922,7 @@ describe('GenericDO schema', () => {
     })
     await registry.put('test.app.do', JSON.stringify(definition))
 
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
     const response = await genericDO.fetch(new Request('https://test.app.do/__schema'))
 
     expect(response.status).toBe(200)
@@ -943,7 +943,7 @@ describe('GenericDO schema', () => {
     })
     await registry.put('test.app.do', JSON.stringify(definition))
 
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
     const response = await genericDO.fetch(new Request('https://test.app.do/__schema'))
 
     const schema = await response.json() as JsonResponse
@@ -972,7 +972,7 @@ describe('GenericDO schema', () => {
     })
     await registry.put('test.app.do', JSON.stringify(definition))
 
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
     const response = await genericDO.fetch(new Request('https://test.app.do/__schema'))
 
     const schema = await response.json() as JsonResponse
@@ -998,7 +998,7 @@ describe('GenericDO schema', () => {
     })
     await registry.put('test.app.do', JSON.stringify(definition))
 
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
     const response = await genericDO.fetch(new Request('https://test.app.do/__schema'))
 
     const schema = await response.json() as JsonResponse
@@ -1022,7 +1022,7 @@ describe('GenericDO schema', () => {
     })
     await registry.put('test.app.do', JSON.stringify(definition))
 
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
     const response = await genericDO.fetch(new Request('https://test.app.do/__schema'))
 
     const schema = await response.json() as JsonResponse
@@ -1049,7 +1049,7 @@ describe('GenericDO schema', () => {
     })
     await registry.put('test.app.do', JSON.stringify(definition))
 
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
     const response = await genericDO.fetch(new Request('https://test.app.do/__schema'))
 
     const schema = await response.json() as JsonResponse
@@ -1067,7 +1067,7 @@ describe('GenericDO schema', () => {
     const definition = createTestDefinition()
     await registry.put('test.app.do', JSON.stringify(definition))
 
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
     const response = await genericDO.fetch(new Request('https://test.app.do/__schema'))
 
     expect(response.headers.get('content-type')).toMatch(/application\/json/)
@@ -1078,7 +1078,7 @@ describe('GenericDO schema', () => {
 // 6. Event Handling Tests
 // =============================================================================
 
-describe('GenericDO event handling', () => {
+describe('DO event handling', () => {
   let registry: R2Bucket
   let state: DurableObjectState
   let env: ReturnType<typeof createMockEnv>
@@ -1103,7 +1103,7 @@ describe('GenericDO event handling', () => {
     })
     await registry.put('test.app.do', JSON.stringify(definition))
 
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     // Send an event
     const eventResponse = await genericDO.fetch(
@@ -1140,7 +1140,7 @@ describe('GenericDO event handling', () => {
     })
     await registry.put('test.app.do', JSON.stringify(definition))
 
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     // Send an unhandled event
     const response = await genericDO.fetch(
@@ -1165,7 +1165,7 @@ describe('GenericDO event handling', () => {
 // 7. MCP (Model Context Protocol) Tests
 // =============================================================================
 
-describe('GenericDO MCP', () => {
+describe('DO MCP', () => {
   let registry: R2Bucket
   let state: DurableObjectState
   let env: ReturnType<typeof createMockEnv>
@@ -1188,14 +1188,14 @@ describe('GenericDO MCP', () => {
   })
 
   it('should expose /mcp endpoint', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
     const response = await genericDO.fetch(new Request('https://test.app.do/mcp'))
 
     expect(response.status).toBe(200)
   })
 
   it('should return MCP-compatible tool definitions', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
     const response = await genericDO.fetch(
       new Request('https://test.app.do/mcp', {
         method: 'POST',
@@ -1216,7 +1216,7 @@ describe('GenericDO MCP', () => {
   })
 
   it('should handle MCP tool calls', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
     const response = await genericDO.fetch(
       new Request('https://test.app.do/mcp', {
         method: 'POST',
@@ -1313,7 +1313,7 @@ describe('createContext', () => {
 // 9. Definition Update Tests
 // =============================================================================
 
-describe('GenericDO definition updates', () => {
+describe('DO definition updates', () => {
   let registry: R2Bucket
   let state: DurableObjectState
   let env: ReturnType<typeof createMockEnv>
@@ -1325,7 +1325,7 @@ describe('GenericDO definition updates', () => {
   })
 
   it('should allow PUT to create/update definition', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     const definition = {
       $id: 'test.app.do',
@@ -1353,7 +1353,7 @@ describe('GenericDO definition updates', () => {
   })
 
   it('should require authentication for PUT', async () => {
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     const response = await genericDO.fetch(
       new Request('https://test.app.do/', {
@@ -1373,7 +1373,7 @@ describe('GenericDO definition updates', () => {
     })
     await registry.put('test.app.do', JSON.stringify(initialDef))
 
-    const genericDO = new GenericDO(state, env)
+    const genericDO = new DO(state, env)
 
     // First call loads and caches v1
     const v1Response = await genericDO.fetch(

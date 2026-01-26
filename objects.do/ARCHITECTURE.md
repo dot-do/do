@@ -1,7 +1,12 @@
-# do.do - Universal DO Runtime & Service Hub
+# objects.do - Universal DO Runtime & Service Hub
 
 > Every DO is data. No deployment needed.
 > One binding to rule them all.
+
+## Naming Convention
+
+- **`do`** (lowercase) = Universal RPC execution (the service binding)
+- **`DO`** (uppercase) = Digital/Durable Object (the runtime class)
 
 ## The Hub Pattern
 
@@ -10,7 +15,7 @@ Instead of every worker needing bindings to auth, stripe, esbuild, etc., they ju
 ```
 User's worker
     │
-    └── [DO binding] → do.do (the hub)
+    └── [do binding] → objects.do (the hub)
                           │
                           ├── auth.do     (authentication)
                           ├── oauth.do    (OAuth providers)
@@ -19,29 +24,29 @@ User's worker
                           ├── stripe.do   (payments)
                           ├── github.do   (repos, PRs)
                           ├── ai.do       (LLMs, embeddings)
-                          └── objects.do  (DO registry & runtime)
+                          └── DO          (the universal runtime class)
 ```
 
 **User's wrangler.jsonc is trivial:**
 ```jsonc
 {
   "services": [
-    { "binding": "DO", "service": "do-do" }
+    { "binding": "do", "service": "objects-do" }
   ]
 }
 ```
 
 **All capabilities through one binding:**
 ```typescript
-// Services
-await env.DO.auth.verify(token)
-await env.DO.stripe.customers.create({ email })
-await env.DO.esbuild.transform(code)
-await env.DO.ai.generate(prompt)
-await env.DO.github.repos.get('owner/repo')
+// Services via `do`
+await env.do.auth.verify(token)
+await env.do.stripe.customers.create({ email })
+await env.do.esbuild.transform(code)
+await env.do.ai.generate(prompt)
+await env.do.github.repos.get('owner/repo')
 
-// DOs
-const startup = await env.DO.get('startup.do')
+// DOs via `do`
+const startup = await env.do.get('startup.do')
 await startup.customers.create({ name: 'Acme' })
 ```
 

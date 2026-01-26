@@ -4,10 +4,10 @@
   "compatibility_date": "2024-12-01",
   "compatibility_flags": ["nodejs_compat"],
 
-  // The universal DO runtime
+  // The universal DO class
   "durable_objects": {
     "bindings": [
-      { "name": "OBJECTS", "class_name": "GenericDO" }
+      { "name": "DO", "class_name": "DO" }
     ]
   },
 
@@ -20,11 +20,15 @@
   "services": [
     { "binding": "ESBUILD", "service": "esbuild-do" },
     { "binding": "STRIPE", "service": "stripe-do" },
-    { "binding": "AI", "service": "ai-do" }
+    { "binding": "GITHUB", "service": "github-do" },
+    { "binding": "AI", "service": "ai-do" },
+    { "binding": "AUTH", "service": "auth-do" },
+    { "binding": "OAUTH", "service": "oauth-do" },
+    { "binding": "MCP", "service": "mcp-do" }
   ],
 
-  // SQLite for GenericDO storage
+  // SQLite for DO storage
   "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["GenericDO"] }
+    { "tag": "v1", "new_sqlite_classes": ["DO"] }
   ]
 }

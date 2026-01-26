@@ -1,7 +1,7 @@
 /**
- * objects.do GenericDO - Universal DO Runtime
+ * objects.do DO - Universal DO Runtime
  *
- * The GenericDO class is a universal Durable Object runtime that interprets
+ * The DO class is a universal Durable Object runtime that interprets
  * DO definitions as data. It loads definitions from the registry and executes
  * them without any deployment.
  *
@@ -14,11 +14,11 @@ import { executeFunction, validateFunctionCode } from './executor'
 import { safeParseDODefinition, RPC_ERROR_CODES, createRPCError, createRPCSuccess } from './schema'
 
 // =============================================================================
-// GenericDO Class
+// DO Class
 // =============================================================================
 
 /**
- * GenericDO - Universal DO Runtime
+ * DO - Universal DO Runtime
  *
  * Loads and executes DO definitions from the registry. Handles:
  * - RPC requests (JSON-RPC and REST-style)
@@ -27,7 +27,7 @@ import { safeParseDODefinition, RPC_ERROR_CODES, createRPCError, createRPCSucces
  * - Schema generation
  * - MCP (Model Context Protocol) for AI agents
  */
-export class GenericDO {
+export class DO {
   private state: DurableObjectState
   private env: Env
   private definition: DODefinition | null = null
