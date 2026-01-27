@@ -1,33 +1,7 @@
-# Dependencies
 node_modules/
-
-# Build output
 dist/
-
-# Wrangler
 .wrangler/
-
-# Local development secrets
 .dev.vars
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
 *.log
-npm-debug.log*
-
-# Test coverage
-tests/coverage/
-
-# Temporary files
-*.tmp
-*.temp
-site/
+.DS_Store
+coverage/
