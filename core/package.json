@@ -11,14 +11,19 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
-    "@dotdo/rpc": "^0.1.1"
+    "@dotdo/capnweb": "^0.4.0",
+    "@dotdo/collections": "^0.1.0"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.8.0",

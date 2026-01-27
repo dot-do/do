@@ -30,6 +30,15 @@ export function createRels(sql: SqlStorage) {
     CREATE INDEX IF NOT EXISTS idx_rels_pred ON _rels(predicate);
   `)
 
+  const mapRow = (row: Record<string, unknown>): Rel => ({
+    id: row.id as string,
+    from: row.from as string,
+    predicate: row.predicate as string,
+    to: row.to as string,
+    reverse: row.reverse as string | undefined,
+    createdAt: row.created_at as number,
+  })
+
   return {
     add(from: string, predicate: string, to: string, reverse?: string): Rel {
       const id = `${from}:${predicate}:${to}`
@@ -49,21 +58,22 @@ export function createRels(sql: SqlStorage) {
     },
 
     get(id: string): Rel | null {
-      return sql.exec(`SELECT * FROM _rels WHERE id = ?`, id).one() as Rel | null
+      const row = sql.exec(`SELECT * FROM _rels WHERE id = ?`, id).one()
+      return row ? mapRow(row) : null
     },
 
     from(id: string, predicate?: string): Rel[] {
       if (predicate) {
-        return sql.exec(`SELECT * FROM _rels WHERE "from" = ? AND predicate = ?`, id, predicate).toArray() as Rel[]
+        return sql.exec(`SELECT * FROM _rels WHERE "from" = ? AND predicate = ?`, id, predicate).toArray().map(mapRow)
       }
-      return sql.exec(`SELECT * FROM _rels WHERE "from" = ?`, id).toArray() as Rel[]
+      return sql.exec(`SELECT * FROM _rels WHERE "from" = ?`, id).toArray().map(mapRow)
     },
 
     to(id: string, predicate?: string): Rel[] {
       if (predicate) {
-        return sql.exec(`SELECT * FROM _rels WHERE "to" = ? AND predicate = ?`, id, predicate).toArray() as Rel[]
+        return sql.exec(`SELECT * FROM _rels WHERE "to" = ? AND predicate = ?`, id, predicate).toArray().map(mapRow)
       }
-      return sql.exec(`SELECT * FROM _rels WHERE "to" = ?`, id).toArray() as Rel[]
+      return sql.exec(`SELECT * FROM _rels WHERE "to" = ?`, id).toArray().map(mapRow)
     },
   }
 }
