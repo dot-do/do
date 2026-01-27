@@ -1,0 +1,32 @@
+{
+  "name": "objects-do",
+  "main": "index.ts",
+  "compatibility_date": "2025-01-13",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Durable Object bindings
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "DO",
+        "class_name": "DigitalObject"
+      }
+    ]
+  },
+
+  // Migrations for DO classes
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["DigitalObject"]
+    }
+  ],
+
+  // Pipeline for CDC events (when ready)
+  // "pipelines": [
+  //   {
+  //     "binding": "CDC_PIPELINE",
+  //     "pipeline": "do-cdc"
+  //   }
+  // ]
+}
