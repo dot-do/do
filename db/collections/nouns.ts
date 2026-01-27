@@ -181,9 +181,8 @@ export class NounCollection extends BaseCollection<Noun> {
       throw new ValidationError(`Slug '${data.slug}' already exists`, 'slug')
     }
 
-    // 3. Generate ID and timestamps
+    // 3. Generate ID
     const id = this.generateId()
-    const timestamp = this.now()
 
     // 4. Create noun entity
     const noun: Noun = {
@@ -194,8 +193,6 @@ export class NounCollection extends BaseCollection<Noun> {
       slug: data.slug,
       schema: data.schema,
       description: data.description,
-      createdAt: timestamp,
-      updatedAt: timestamp,
     }
 
     // 5. Store in KV
@@ -300,7 +297,6 @@ export class NounCollection extends BaseCollection<Noun> {
     const updated: Noun = {
       ...existing,
       schema,
-      updatedAt: this.now(),
     }
 
     const key = `${this.config.name}:${id}`

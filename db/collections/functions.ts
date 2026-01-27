@@ -108,6 +108,8 @@ export type FunctionConfig = CodeFunctionConfig | GenerativeFunctionConfig | Age
  * Function entity - a stored function definition
  */
 export interface FunctionEntity {
+  /** Unique identifier (func_ prefix) - same as $id for BaseEntity compatibility */
+  id: string
   /** Unique identifier (func_ prefix) */
   $id: string
   /** Entity type - always 'Function' */
@@ -593,8 +595,10 @@ export class FunctionCollection extends BaseCollection<FunctionBaseEntity> {
    * Convert internal entity to FunctionEntity
    */
   private toFunctionEntity(entity: FunctionBaseEntity): FunctionEntity {
+    const id = entity.$id || entity.id
     return {
-      $id: entity.$id || entity.id,
+      id,
+      $id: id,
       $type: 'Function',
       functionType: entity.functionType,
       name: entity.name,

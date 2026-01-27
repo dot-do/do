@@ -301,15 +301,12 @@ export class VerbCollection extends BaseCollection<Verb> {
       throw new ValidationError(`Verb with action '${data.action}' already exists`, 'action')
     }
 
-    // 3. Generate ID and timestamps
+    // 3. Generate ID
     const id = this.generateId()
-    const timestamp = this.now()
 
     const verb: Verb = {
       ...data,
       id,
-      createdAt: timestamp,
-      updatedAt: timestamp,
     }
 
     // 4. Store in storage

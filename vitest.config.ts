@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config'
+import { resolve } from 'node:path'
 
 /**
  * Vitest Configuration for DO (Digital Object) Project
@@ -18,6 +19,18 @@ import { defineConfig } from 'vitest/config'
  * prevent memory exhaustion by limiting parallel execution.
  */
 export default defineConfig({
+  resolve: {
+    alias: [
+      // More specific paths must come first
+      { find: '@dotdo/cli/plugins/objects', replacement: resolve(__dirname, 'cli/src/plugins/objects.ts') },
+      { find: '@dotdo/cli/plugins', replacement: resolve(__dirname, 'cli/src/plugins.ts') },
+      { find: '@dotdo/cli/objects', replacement: resolve(__dirname, 'cli/src/objects.ts') },
+      { find: '@dotdo/cli/config', replacement: resolve(__dirname, 'cli/src/config.ts') },
+      { find: '@dotdo/cli/parser', replacement: resolve(__dirname, 'cli/src/parser.ts') },
+      { find: '@dotdo/cli/auth', replacement: resolve(__dirname, 'cli/src/auth.ts') },
+      { find: '@dotdo/cli', replacement: resolve(__dirname, 'cli/src/index.ts') },
+    ],
+  },
   test: {
     // Test file patterns - test files alongside source
     include: ['**/*.test.ts', '**/*.spec.ts'],
