@@ -1,0 +1,28 @@
+{
+  "name": "dotdo-ai",
+  "account_id": "b6641681fe423910342b9ffa1364c76d",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-01-20",
+  "compatibility_flags": ["nodejs_compat_v2"],
+
+  // Route to ai.do (enable when domain is configured)
+  // "routes": [
+  //   { "pattern": "ai.do", "custom_domain": true }
+  // ],
+
+  // Workers AI binding with AI Gateway support
+  // When using env.AI.gateway(), requests are pre-authenticated
+  "ai": {
+    "binding": "AI"
+  },
+
+  // Secrets for API keys (set via wrangler secret put)
+  // OPENAI_API_KEY
+  // ANTHROPIC_API_KEY
+  // GOOGLE_API_KEY
+
+  // Tail worker for observability
+  "tail_consumers": [
+    { "service": "tail-do" }
+  ]
+}

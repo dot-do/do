@@ -1,0 +1,17 @@
+{
+  "name": "tail-do",
+  "account_id": "b6641681fe423910342b9ffa1364c76d",
+  "main": "index.ts",
+  "compatibility_date": "2026-01-20",
+  "compatibility_flags": ["nodejs_compat_v2"],
+
+  // events_stream -> events pipeline -> R2 Data Catalog (Parquet/Iceberg)
+  "pipelines": [
+    {
+      "binding": "EVENTS",
+      "pipeline": "7cd1ad33065d4180b2f817ae27486ce9"  // events_stream
+    }
+  ]
+
+  // NO service bindings - isolation pattern to prevent infinite loops
+}

@@ -1,8 +1,26 @@
 {
   "name": "objects-do",
+  "account_id": "b6641681fe423910342b9ffa1364c76d",
   "main": "index.ts",
   "compatibility_date": "2025-01-20",
   "compatibility_flags": ["nodejs_compat_v2"],
+
+  // Route to objects.do
+  "routes": [
+    { "pattern": "objects.do", "custom_domain": true }
+  ],
+
+  // Service bindings
+  "services": [
+    { "binding": "CTX", "service": "ctx" },
+    { "binding": "EVAL", "service": "evaluate-do" },
+    { "binding": "ai", "service": "dotdo-ai" }
+  ],
+
+  // Workers AI binding (for direct CF model access)
+  "ai": {
+    "binding": "AI"
+  },
 
   // Durable Object bindings
   "durable_objects": {
@@ -18,9 +36,20 @@
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": ["DigitalObject"]
+      "new_sqlite_classes": ["DO"]
+    },
+    {
+      "tag": "v2",
+      "renamed_classes": [
+        { "from": "DO", "to": "DigitalObject" }
+      ]
     }
   ],
+
+  // Tail worker for observability
+  "tail_consumers": [
+    { "service": "tail-do" }
+  ]
 
   // Pipeline for CDC events (when ready)
   // "pipelines": [

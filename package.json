@@ -4,19 +4,26 @@
   "private": true,
   "description": "objects.do - Managed Digital Object service",
   "type": "module",
+  "bin": {
+    "objects": "./dist/cli/index.js"
+  },
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "build:cli": "tsup cli/index.ts --format esm --out-dir dist/cli && node -e \"const fs=require('fs');const c=fs.readFileSync('dist/cli/index.js','utf8');fs.writeFileSync('dist/cli/index.js','#!/usr/bin/env node\\n'+c);\" && chmod +x dist/cli/index.js",
     "test": "vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@dotdo/cli": "^0.2.5",
     "@dotdo/do": "file:./core"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250121.0",
+    "@types/node": "^22.0.0",
     "colo.do": "^0.1.1",
+    "tsup": "^8.0.0",
     "typescript": "^5.7.3",
     "vitest": "^3.0.0",
     "wrangler": "^4.0.0"

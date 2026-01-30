@@ -1,0 +1,47 @@
+{
+  "name": "analytics-benchmark",
+  "account_id": "b6641681fe423910342b9ffa1364c76d",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-01-20",
+  "compatibility_flags": ["nodejs_compat_v2"],
+
+  // R2 bucket for ClickBench data
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "analytics-benchmark"
+    }
+  ],
+
+  // KV for storing benchmark results
+  "kv_namespaces": [
+    {
+      "binding": "RESULTS",
+      "id": "71297e4f668040d381d532f75e78291b"
+    }
+  ],
+
+  // Service binding to cloudflare worker for R2 SQL queries
+  "services": [
+    {
+      "binding": "cloudflare",
+      "service": "cloudflare"
+    }
+  ],
+
+  // AI binding for potential AI-powered query analysis
+  "ai": {
+    "binding": "AI"
+  },
+
+  // Environment variables
+  "vars": {
+    "R2_BUCKET_NAME": "platform-graph"
+  },
+
+  // Development settings
+  "dev": {
+    "port": 8787,
+    "local_protocol": "http"
+  }
+}

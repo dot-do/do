@@ -5,12 +5,14 @@ export default defineWorkersConfig({
     poolOptions: {
       workers: {
         miniflare: {
+          compatibilityDate: '2025-01-20',
+          compatibilityFlags: ['nodejs_compat_v2'],
           durableObjects: {
             DO: 'DigitalObject',
           },
         },
       },
     },
-    include: ['tests/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
   },
 })
