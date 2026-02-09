@@ -19,6 +19,16 @@ export { type Relationship, type ExpandOptions } from './rels.js'
 export { type CDCEvent, type SemanticEvent } from './cdc.js'
 export { type StoredFunction, type FunctionRegistry, type CodeFunction, type GenerativeFunction } from './functions.js'
 export { DO, DigitalObjectDefinition, type DODefinition, type DOContext, type DOInstance, type InferSchema } from './do.js'
+export {
+  type HookContext,
+  type HookEntry,
+  type HookRegistry,
+  getOrCreateRegistry,
+  hookKey,
+  registerHook,
+  unregisterHook,
+  pastTense,
+} from './hooks.js'
 
 /**
  * QueryBuilder - chainable query interface for collections
